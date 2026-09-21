@@ -64,7 +64,8 @@ export const login = async (req, res) => {
   const bootstrapAccounts = [
     { email: 'admin@bababroker.com', phone: '9586505111', role: 'admin', name: 'Admin' },
     { email: 'salesman@bababroker.com', phone: '9891140379', role: 'salesman', name: 'Salesman' },
-    { email: 'employee@bababroker.com', phone: '9810022334', role: 'employee', name: 'Employee' },
+    { email: 'employee@bababroker.com', phone: '9319290979', role: 'employee', name: 'Employee' },
+    { email: 'employee2@bababroker.com', phone: '9810022334', role: 'employee', name: 'Employee' },
   ];
   const isBootstrapMatch = bootstrapAccounts.find(
     (b) => b.email === loginIdentifier || (cleanPhone && b.phone === cleanPhone)

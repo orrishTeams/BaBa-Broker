@@ -16,10 +16,12 @@ const router = Router();
 
 router.use(requireDb, requireAuth);
 
-router.post('/bulk-upload', requireRole('admin'), upload.single('file'), asyncHandler(uploadExcelFlatListings));
-router.post('/upload', requireRole('admin'), upload.single('file'), asyncHandler(uploadExcelFlatListings));
-router.post('/push', requireRole('admin'), asyncHandler(pushFlatListingData));
-router.post('/image', requireRole('admin'), upload.single('file'), asyncHandler(async (req, res) => {
+const ALLOWED_UPLOAD_ROLES = ['admin', 'employee', 'staff', 'salesman'];
+
+router.post('/bulk-upload', requireRole(ALLOWED_UPLOAD_ROLES), upload.single('file'), asyncHandler(uploadExcelFlatListings));
+router.post('/upload', requireRole(ALLOWED_UPLOAD_ROLES), upload.single('file'), asyncHandler(uploadExcelFlatListings));
+router.post('/push', requireRole(ALLOWED_UPLOAD_ROLES), asyncHandler(pushFlatListingData));
+router.post('/image', requireRole(ALLOWED_UPLOAD_ROLES), upload.single('file'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
   try {
     const url = await uploadBase64ToImageKit(req.file.buffer.toString('base64'), req.file.originalname || `img-${Date.now()}`);
@@ -29,7 +31,7 @@ router.post('/image', requireRole('admin'), upload.single('file'), asyncHandler(
     res.status(500).json({ error: err.message });
   }
 }));
-router.post('/image-from-url', requireRole('admin'), asyncHandler(async (req, res) => {
+router.post('/image-from-url', requireRole(ALLOWED_UPLOAD_ROLES), asyncHandler(async (req, res) => {
   const { url, fileName } = req.body || {};
   if (!url) return res.status(400).json({ error: 'url is required' });
   try {
@@ -40,6 +42,6 @@ router.post('/image-from-url', requireRole('admin'), asyncHandler(async (req, re
     res.status(500).json({ error: err.message });
   }
 }));
-router.get('/flat-listings', requireRole('admin'), asyncHandler(getExcelUploadHistory));
+router.get('/flat-listings', requireRole(ALLOWED_UPLOAD_ROLES), asyncHandler(getExcelUploadHistory));
 
 export default router;

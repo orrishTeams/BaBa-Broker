@@ -19,7 +19,7 @@ const BOOTSTRAP_ACCOUNTS = [
   {
     name: 'Employee',
     email: (process.env.EMPLOYEE_EMAIL || 'employee@bababroker.com').trim().toLowerCase(),
-    phone: '9810022334',
+    phone: process.env.EMPLOYEE_PHONE || '9319290979',
     password: process.env.EMPLOYEE_PASSWORD || 'Baba@123',
     role: 'employee',
   },

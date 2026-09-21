@@ -60,7 +60,7 @@ export default function StaffManagementView() {
           _id: 'staff-2',
           name: 'Pooja Verma',
           email: 'employee@bababroker.com',
-          phone: '9810022334',
+          phone: '9319290979',
           displayPassword: 'Baba@123',
           role: 'employee',
           isActive: true,

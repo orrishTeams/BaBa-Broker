@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 const projectDirectory = dirname(dirname(fileURLToPath(import.meta.url)));
 const viteCommand = process.platform === 'win32' ? 'vite.cmd' : 'vite';
 
-const server = spawn(process.execPath, [join('backend', 'src', 'server.js')], {
+const server = spawn(process.execPath, ['--watch', join('backend', 'src', 'server.js')], {
   cwd: projectDirectory,
   stdio: 'inherit',
 });

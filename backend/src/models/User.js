@@ -18,8 +18,6 @@ const userSchema = new mongoose.Schema(
   { timestamps: true, versionKey: false }
 );
 
-userSchema.index({ email: 1 });
-userSchema.index({ phone: 1 });
 
 userSchema.virtual('isLocked').get(function () {
   return !!(this.lockUntil && this.lockUntil > Date.now());

@@ -33,14 +33,15 @@ function parseCleanNumber(val) {
 
 // Common header alias mappings
 const HEADER_ALIASES = {
+  sno: ['sno', 'srno', 's.no', 'sr.no', 'serialno', 'serialnumber', 'id', 'no', 'seq', 'index'],
   listingType: ['listingtype', 'type', 'propertytype', 'listing', 'for', 'purpose', 'category', 'status', 'adtype', 'dealtype'],
   title: ['title', 'propertytitle', 'propertyname', 'projectname', 'project', 'name', 'heading', 'property', 'flatname'],
-  location: ['location', 'address', 'area', 'locality', 'city', 'place', 'landmark', 'sector', 'society', 'completeaddress', 'colony'],
+  location: ['location', 'colony', 'locality', 'area', 'city', 'place', 'landmark', 'sector', 'society'],
   configuration: ['configuration', 'bhk', 'config', 'bedrooms', 'bedroom', 'room', 'rooms', 'flatsize', 'units', 'unittype'],
-  sizeSqft: ['size', 'gaj', 'sqgaj', 'sizesqft', 'area', 'sqft', 'squarefeet', 'superarea', 'carpetarea', 'builtuparea', 'areasqft', 'sqfeet'],
-  floor: ['floor', 'floorno', 'propertyfloor', 'flatfloor', 'floornumber'],
+  sizeSqft: ['size', 'gaj', 'sqgaj', 'sizesqft', 'area', 'sqft', 'squarefeet', 'superarea', 'carpetarea', 'builtuparea', 'areasqft', 'sqfeet', 'plotsize', 'plot', 'dimension'],
+  floor: ['floor', 'floorno', 'propertyfloor', 'flatfloor', 'floornumber', 'floorposition', 'flr'],
   totalFloors: ['totalfloors', 'totalfloor', 'floors', 'buildingfloors', 'maxfloors', 'numberoffloors'],
-  lift: ['lift', 'elevator', 'liftavailable'],
+  lift: ['lift', 'elevator', 'liftavailable', 'is_lift'],
   parking: ['parking', 'carparking', 'bikeparking', 'parkingtype', 'parkingspace'],
   possessionStatus: ['possessionstatus', 'possession', 'readytomove', 'availability', 'possessiondate'],
   constructionYear: ['constructionyear', 'yearbuilt', 'built', 'age', 'ageofproperty', 'constructionage'],
@@ -55,18 +56,18 @@ const HEADER_ALIASES = {
   securityDeposit: ['securitydeposit', 'deposit', 'advance', 'securityamount'],
   maintenanceCharge: ['maintenancecharge', 'maintenance', 'maintenancecharges', 'maint'],
   availableFrom: ['availablefrom', 'availabledate', 'moveindate', 'fromdate'],
-  salePrice: ['price', 'saleprice', 'amount', 'cost', 'expectedprice', 'totalprice', 'rate', 'value', 'demandprice'],
+  salePrice: ['price', 'saleprice', 'amount', 'cost', 'expectedprice', 'totalprice', 'rate', 'value', 'demandprice', 'demand', 'demand_price'],
   pricePerSqft: ['pricepersqft', 'persqft', 'ratepersqft', 'sqftrate'],
   priceNegotiable: ['pricenegotiable', 'negotiable', 'isnegotiable', 'neg'],
-  ownerName: ['by', 'agent', 'submittedby', 'listedby', 'staff', 'owner', 'ownername', 'contactperson', 'clientname', 'seller', 'landlord', 'agentname'],
-  ownerContact: ['contact', 'contactno', 'phone', 'mobile', 'cell', 'ownermobile', 'contactnumber', 'ownerphone', 'phone_number', 'ownercontact', 'mob'],
+  ownerName: ['by', 'agent', 'submittedby', 'listedby', 'staff', 'owner', 'ownername', 'contactperson', 'clientname', 'seller', 'landlord', 'agentname', 'sourcedby', 'broker', 'associate', 'sourcedassociate'],
+  ownerContact: ['contact', 'contactno', 'phone', 'mobile', 'cell', 'ownermobile', 'contactnumber', 'ownerphone', 'phone_number', 'ownercontact', 'mob', 'phoneno', 'mobile_no'],
   propertyCategory: ['propertycategory', 'category', 'proptype'],
   furnishingStatus: ['furnishingstatus', 'furnishing', 'furnished'],
-  completeAddress: ['address', 'completeaddress', 'fulladdress', 'full_address', 'addressdetails', 'landmark'],
+  completeAddress: ['address', 'completeaddress', 'fulladdress', 'full_address', 'addressdetails', 'landmark', 'addresslandmark', 'colonyaddress'],
   dealStatus: ['dealstatus', 'deal_status', 'availability_status'],
   commission: ['commission', 'brokerage'],
-  specialInstructions: ['additionalcontactnotes', 'additionalcontact', 'notes', 'remarks', 'specialinstructions', 'instructions'],
-  netProfit: ['netprice', 'net_price', 'finalprice', 'lastprice', 'minimumprice', 'netprofit', 'profit'],
+  specialInstructions: ['additionalcontactnotes', 'additionalcontact', 'notes', 'remarks', 'specialinstructions', 'instructions', 'additionalnotes', 'othernotes', 'note', 'additionalcontact/notes', 'additional_contact_notes'],
+  netProfit: ['netprice', 'net_price', 'finalprice', 'lastprice', 'minimumprice', 'netprofit', 'profit', 'netamount', 'netrent', 'net'],
 };
 
 function getRowValue(rowObj, canonicalField) {
@@ -86,11 +87,28 @@ function getRowValue(rowObj, canonicalField) {
 function expandFloorName(rawFloor) {
   const f = String(rawFloor || '').trim().toUpperCase();
   if (!f) return '';
-  if (f === 'G-FS') return 'Ground Floor (Front Side)';
-  if (f === 'UG FS' || f === 'UG-FS' || f === 'UGFS') return 'Upper Ground (Front Side)';
-  if (f === 'T-BS' || f === 'TBS') return 'Top Floor (Back Side)';
-  if (f === '2ND-BS' || f === '2NDBS') return '2nd Floor (Back Side)';
-  if (f === 'ND&3RD B' || f === '2ND&3RD B') return '2nd & 3rd Floor (Back Side)';
+  if (f === 'G-FS' || f === 'GFS' || f === 'G FS' || f === 'G (FS)') return 'Ground Floor (Front Side)';
+  if (f === 'G-BS' || f === 'GBS' || f === 'G BS' || f === 'G (BS)') return 'Ground Floor (Back Side)';
+  if (f === 'UG-FS' || f === 'UG FS' || f === 'UGFS' || f === 'UG (FS)') return 'Upper Ground (Front Side)';
+  if (f === 'UG-BS' || f === 'UG BS' || f === 'UGBS' || f === 'UG (BS)') return 'Upper Ground (Back Side)';
+  if (f === '1ST-FS' || f === '1ST FS' || f === '1STFS' || f === '1-FS' || f === '1FS') return '1st Floor (Front Side)';
+  if (f === '1ST-BS' || f === '1ST BS' || f === '1STBS' || f === '1-BS' || f === '1BS') return '1st Floor (Back Side)';
+  if (f === '2ND-FS' || f === '2ND FS' || f === '2NDFS' || f === '2-FS' || f === '2FS') return '2nd Floor (Front Side)';
+  if (f === '2ND-BS' || f === '2ND BS' || f === '2NDBS' || f === '2-BS' || f === '2BS') return '2nd Floor (Back Side)';
+  if (f === '3RD-FS' || f === '3RD FS' || f === '3RDF' || f === '3-FS' || f === '3FS') return '3rd Floor (Front Side)';
+  if (f === '3RD-BS' || f === '3RD BS' || f === '3RDBS' || f === '3-BS' || f === '3BS') return '3rd Floor (Back Side)';
+  if (f === '4TH-FS' || f === '4TH FS' || f === '4THFS' || f === '4-FS' || f === '4FS') return '4th Floor (Front Side)';
+  if (f === '4TH-BS' || f === '4TH BS' || f === '4THBS' || f === '4-BS' || f === '4BS') return '4th Floor (Back Side)';
+  if (f === 'T-FS' || f === 'TFS' || f === 'TOP-FS' || f === 'TOP FS') return 'Top Floor (Front Side)';
+  if (f === 'T-BS' || f === 'TBS' || f === 'TOP-BS' || f === 'TOP BS') return 'Top Floor (Back Side)';
+  if (f === 'G' || f === 'GROUND') return 'Ground Floor';
+  if (f === 'UG' || f === 'UPPER GROUND') return 'Upper Ground';
+  if (f === '1ST' || f === '1' || f === 'FIRST') return '1st Floor';
+  if (f === '2ND' || f === '2' || f === 'SECOND') return '2nd Floor';
+  if (f === '3RD' || f === '3' || f === 'THIRD') return '3rd Floor';
+  if (f === '4TH' || f === '4' || f === 'FOURTH') return '4th Floor';
+  if (f === 'TOP' || f === 'T') return 'Top Floor';
+  if (f === 'JAD SE' || f === 'JADSE' || f === 'JAD-SE' || f === 'JAD') return 'Jad se (Independent Building)';
   return String(rawFloor).trim();
 }
 
@@ -119,11 +137,9 @@ function processRowToFlatListing(rowObj, rowIndex, userId) {
     listingType = 'rent';
   }
 
-  // Location resolution
-  let location = String(getRowValue(rowObj, 'location') || getRowValue(rowObj, 'completeAddress') || '').trim();
-  if (!location) {
-    location = 'Dwarka Mor / Uttam Nagar, Delhi';
-  }
+  // Location & Address resolution
+  const location = String(getRowValue(rowObj, 'location') || '').trim();
+  const completeAddress = String(getRowValue(rowObj, 'completeAddress') || location).trim();
 
   // Size & Configuration resolution
   const rawSize = String(getRowValue(rowObj, 'sizeSqft') || '').trim();
@@ -160,26 +176,28 @@ function processRowToFlatListing(rowObj, rowIndex, userId) {
 
   if (!configuration) {
     const combined = `${rawTitle} ${rawDesc} ${rawSize}`;
-    const match = combined.match(/\b([1-9]\s*bhk|[1-9]\s*rk|studio|commercial|office|shop|plot)\b/i);
-    configuration = match ? match[1].toUpperCase() : '2 BHK';
+    const match = combined.match(/\b([1-9]\s*bhk|[1-9]\s*rk|studio|commercial|office|shop|plot|jad\s*se)\b/i);
+    if (match) {
+      configuration = match[1].toUpperCase();
+    }
   }
 
   // Floor resolution
-  const floor = expandFloorName(getRowValue(rowObj, 'floor'));
+  const rawFloor = getRowValue(rowObj, 'floor');
+  const floor = rawFloor ? expandFloorName(rawFloor) : '';
 
   // Title resolution
-  const title = rawTitle || `${configuration} ${sizeSqft ? `(${sizeSqft})` : ''} at ${location}`.replace(/\s+/g, ' ').trim();
+  const title = rawTitle || [configuration, sizeSqft ? `(${sizeSqft})` : '', location ? `at ${location}` : ''].filter(Boolean).join(' ').trim();
 
   // Agent / Owner details
-  const ownerName = String(getRowValue(rowObj, 'ownerName') || 'Property Associate').trim();
+  const ownerName = String(getRowValue(rowObj, 'ownerName') || '').trim();
   const ownerContact = String(getRowValue(rowObj, 'ownerContact') || '').replace(/[^\d+]/g, '');
-  const completeAddress = String(getRowValue(rowObj, 'completeAddress') || location).trim();
   const notes = String(getRowValue(rowObj, 'specialInstructions') || '').trim();
 
-  // Description resolution
+  // Description resolution (no fake data)
   const description =
     rawDesc ||
-    `${configuration} property ${sizeSqft ? `measuring ${sizeSqft}` : ''} ${floor ? `on ${floor}` : ''} situated at ${location}. Excellent residential location with convenient road connectivity. Listed by: ${ownerName}. ${notes ? `Notes: ${notes}` : ''}`.trim();
+    [configuration, sizeSqft, floor, location, notes ? `Notes: ${notes}` : ''].filter(Boolean).join(' | ');
 
   // Price resolution
   let salePrice = rawSalePrice || rawNetPrice || 0;
@@ -191,11 +209,27 @@ function processRowToFlatListing(rowObj, rowIndex, userId) {
     salePrice = monthlyRent;
   }
 
-  const liftVal = String(getRowValue(rowObj, 'lift') || 'NO').trim().toUpperCase();
-  const lift = liftVal === 'YES' || liftVal === 'TRUE' ? 'YES' : 'NO';
+  // Lift resolution
+  const rawLift = String(getRowValue(rowObj, 'lift') || '').trim().toUpperCase();
+  let lift = '';
+  if (rawLift === 'YES' || rawLift === 'Y' || rawLift === 'TRUE' || rawLift === '1') {
+    lift = 'YES';
+  } else if (rawLift === 'NO' || rawLift === 'N' || rawLift === 'FALSE' || rawLift === '0') {
+    lift = 'NO';
+  } else if (rawLift) {
+    lift = rawLift;
+  }
 
-  const parkingRaw = String(getRowValue(rowObj, 'parking') || 'Bike Parking').trim().toUpperCase();
-  const parking = parkingRaw.includes('CAR') ? 'Car + Bike Parking' : parkingRaw.includes('BIKE') ? 'Bike Parking' : 'Bike Parking';
+  // Parking resolution
+  const rawParking = String(getRowValue(rowObj, 'parking') || '').trim();
+  let parking = rawParking;
+  if (rawParking.toUpperCase().includes('CAR') && rawParking.toUpperCase().includes('BIKE')) {
+    parking = 'Car + Bike Parking';
+  } else if (rawParking.toUpperCase().includes('CAR')) {
+    parking = 'Car Parking';
+  } else if (rawParking.toUpperCase().includes('BIKE')) {
+    parking = 'Bike Parking';
+  }
 
   const rawCategory = String(getRowValue(rowObj, 'propertyCategory') || '').trim();
   const propertyCategory = ['RK', 'HK', 'Office', 'Shop', 'Plot'].includes(rawCategory) ? rawCategory : configuration.includes('RK') ? 'RK' : 'HK';
@@ -208,16 +242,16 @@ function processRowToFlatListing(rowObj, rowIndex, userId) {
     title,
     location,
     configuration,
-    sizeSqft: sizeSqft || '450 sq.ft',
-    floor: floor || '2nd Floor',
-    totalFloors: String(getRowValue(rowObj, 'totalFloors') || '4').trim(),
+    sizeSqft,
+    floor,
+    totalFloors: String(getRowValue(rowObj, 'totalFloors') || '').trim(),
     lift,
     parking,
-    possessionStatus: String(getRowValue(rowObj, 'possessionStatus') || 'Ready to Move').trim(),
-    constructionYear: String(getRowValue(rowObj, 'constructionYear') || '2023').trim(),
-    facing: String(getRowValue(rowObj, 'facing') || 'East').trim(),
-    reraId: String(getRowValue(rowObj, 'reraId') || 'RERA Not Applicable').trim(),
-    amenities: String(getRowValue(rowObj, 'amenities') || '24x7 Water Supply, Gated Entry, Power Backup').trim(),
+    possessionStatus: String(getRowValue(rowObj, 'possessionStatus') || '').trim(),
+    constructionYear: String(getRowValue(rowObj, 'constructionYear') || '').trim(),
+    facing: String(getRowValue(rowObj, 'facing') || '').trim(),
+    reraId: String(getRowValue(rowObj, 'reraId') || '').trim(),
+    amenities: String(getRowValue(rowObj, 'amenities') || '').trim(),
     description,
     coverImage: String(getRowValue(rowObj, 'coverImage') || '').trim(),
     images: [],
@@ -225,14 +259,14 @@ function processRowToFlatListing(rowObj, rowIndex, userId) {
     monthlyRent,
     securityDeposit: parseCleanNumber(getRowValue(rowObj, 'securityDeposit')),
     maintenanceCharge: parseCleanNumber(getRowValue(rowObj, 'maintenanceCharge')),
-    availableFrom: String(getRowValue(rowObj, 'availableFrom') || 'Immediate').trim(),
+    availableFrom: String(getRowValue(rowObj, 'availableFrom') || '').trim(),
     salePrice,
     pricePerSqft: parseCleanNumber(getRowValue(rowObj, 'pricePerSqft')),
     priceNegotiable: rawNetPrice > 0 ? true : Boolean(getRowValue(rowObj, 'priceNegotiable')),
     ownerName,
     ownerContact,
     propertyCategory,
-    furnishingStatus: 'Semi-Furnished',
+    furnishingStatus: String(getRowValue(rowObj, 'furnishingStatus') || '').trim(),
     completeAddress,
     latitude: String(getRowValue(rowObj, 'latitude') || '').trim(),
     longitude: String(getRowValue(rowObj, 'longitude') || '').trim(),
@@ -263,6 +297,13 @@ export const uploadExcelFlatListings = async (req, res) => {
 
   if (!Array.isArray(rows) || rows.length === 0) {
     return res.status(400).json({ error: 'File contains no data rows.' });
+  }
+
+  // If replaceExisting query or body flag is set (or clean=true), clear out existing inventory first
+  const shouldReplace = req.query.replaceExisting === 'true' || req.query.clean === 'true' || req.body?.replaceExisting === 'true' || req.body?.replaceExisting === true;
+  if (shouldReplace) {
+    const filter = req.user.role === 'salesman' ? { submittedBy: req.user.id } : {};
+    await FlatListing.deleteMany(filter);
   }
 
   const results = { success: [], failed: [], total: rows.length, importedCount: 0 };

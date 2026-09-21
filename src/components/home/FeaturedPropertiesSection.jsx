@@ -76,14 +76,22 @@ export default function FeaturedPropertiesSection() {
     const listToUse = featured.length > 0 ? featured : fallbackProperties;
 
     return listToUse.map((p, idx) => {
-      const imgList =
+      const defaultImg =
+        'https://housing-images.n7net.in/4f2250e8/233a502501247c905f9f712e15231459/v0/large/planner_lotus_residency-sewak_park-new+delhi-planner_n_maker.jpeg';
+
+      const rawImgs =
         Array.isArray(p.images) && p.images.length > 0
           ? p.images
           : p.image
           ? [p.image]
-          : [
-              'https://housing-images.n7net.in/4f2250e8/233a502501247c905f9f712e15231459/v0/large/planner_lotus_residency-sewak_park-new+delhi-planner_n_maker.jpeg',
-            ];
+          : [defaultImg];
+
+      // Filter out stale temporary browser blob: URLs
+      const cleanImgs = rawImgs
+        .map((img) => (typeof img === 'string' && img.startsWith('blob:') ? defaultImg : img))
+        .filter(Boolean);
+
+      const displayImg = cleanImgs[0] || defaultImg;
 
       const priceStr =
         p.price || (p.totalValuation ? `₹ ${(p.totalValuation / 100000).toFixed(1)} Lakhs` : 'Price on Request');
@@ -124,7 +132,7 @@ export default function FeaturedPropertiesSection() {
         location: p.location,
         price: priceStr,
         categoryLabel,
-        image: imgList[0],
+        image: displayImg,
         tag: p.tag || '🔥 HOT DEAL',
         details: specPills,
       };
@@ -187,6 +195,11 @@ export default function FeaturedPropertiesSection() {
                 <img
                   src={property.image}
                   alt={property.title}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src =
+                      'https://housing-images.n7net.in/4f2250e8/233a502501247c905f9f712e15231459/v0/large/planner_lotus_residency-sewak_park-new+delhi-planner_n_maker.jpeg';
+                  }}
                   className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                 />
 

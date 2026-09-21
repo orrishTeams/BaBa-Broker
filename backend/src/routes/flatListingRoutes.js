@@ -9,12 +9,14 @@ import {
   updateFlatListing,
   deactivateFlatListing,
   deleteFlatListing,
+  cleanAllFlatListings,
 } from '../controllers/flatListingController.js';
 
 const router = Router();
 
 router.use(requireDb, requireAuth);
 
+router.delete('/clean/all', requireRole(['salesman', 'employee', 'admin']), asyncHandler(cleanAllFlatListings));
 router.get('/', requireRole(['salesman', 'employee', 'admin']), asyncHandler(getFlatListings));
 router.post('/', requireRole(['salesman', 'employee', 'admin']), asyncHandler(createFlatListing));
 router.put('/:id', requireRole(['salesman', 'employee', 'admin']), asyncHandler(updateFlatListing));

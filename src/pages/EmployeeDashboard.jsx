@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { getAuth, clearAuth } from '../store/auth';
 import { useAppDispatch } from '../store';
 import AssignedLeadsPanel from '../components/AssignedLeadsPanel';
+import AdminExcelView from '../components/admin/AdminExcelView';
 
 const formatINR = (val) => {
   const num = Number(val);
@@ -58,6 +59,7 @@ export default function EmployeeDashboard() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyFlatListing());
   const [editingId, setEditingId] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [viewingProperty, setViewingProperty] = useState(null);
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
@@ -103,82 +105,28 @@ export default function EmployeeDashboard() {
       const res = await api('/api/flat-listings');
       setListings(Array.isArray(res) ? res : []);
     } catch {
-      // Fallback demo inventory for visual preview
-      setListings([
-        {
-          _id: 'emp-demo-1',
-          title: '3 BHK Park View Luxury Builder Floor',
-          location: 'Bhagwati Garden, Dwarka Mor',
-          configuration: '3 BHK',
-          propertyCategory: 'HK',
-          listingType: 'buy',
-          salePrice: 4200000,
-          netProfit: 4000000,
-          sizeSqft: '75 Gaj (675 sq.ft)',
-          floor: '1st Floor (Front Side)',
-          lift: 'YES',
-          parking: 'Car + Bike Parking',
-          furnishingStatus: 'Semi-Furnished',
-          ownerName: 'Dharmendra Sharma',
-          ownerContact: '9560587733',
-          completeAddress: 'Near Spring Medical, Bhagwati Garden, Street No. 4',
-          amenities: '24x7 Water Supply, Gated Entry, Power Backup',
-          dealStatus: 'available',
-          isVerified: true,
-          coverImage: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80',
-          images: [],
-        },
-        {
-          _id: 'emp-demo-2',
-          title: '2 BHK Brand New Floor with Lift & Car Parking',
-          location: 'Mansharam Park, Uttam Nagar',
-          configuration: '2 BHK',
-          propertyCategory: 'HK',
-          listingType: 'buy',
-          salePrice: 2400000,
-          netProfit: 2250000,
-          sizeSqft: '50 Gaj (450 sq.ft)',
-          floor: '2nd Floor',
-          lift: 'YES',
-          parking: 'Car Parking',
-          furnishingStatus: 'Semi-Furnished',
-          ownerName: 'Tripathi Ji',
-          ownerContact: '9891140379',
-          completeAddress: 'Mansharam Park, Near Metro Pillar 750',
-          amenities: 'Lift(s), 24x7 Security, Power Backup',
-          dealStatus: 'available',
-          isVerified: true,
-          coverImage: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&q=80',
-          images: [],
-        },
-        {
-          _id: 'emp-demo-3',
-          title: '1 RK Compact Affordable Studio',
-          location: 'Sulahkul Vihar',
-          configuration: '1 RK',
-          propertyCategory: 'RK',
-          listingType: 'buy',
-          salePrice: 1350000,
-          netProfit: 1250000,
-          sizeSqft: '30 Gaj (270 sq.ft)',
-          floor: 'Ground Floor',
-          lift: 'NO',
-          parking: 'Bike Parking',
-          furnishingStatus: 'Semi-Furnished',
-          ownerName: 'Ojha Ji',
-          ownerContact: '8818631377',
-          completeAddress: 'Near Holy Chowk, Sulahkul Vihar',
-          amenities: 'Separate Submersible, Gated Gali',
-          dealStatus: 'available',
-          isVerified: false,
-          coverImage: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80',
-          images: [],
-        }
-      ]);
+      setListings([]);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const cleanAllInventory = async () => {
+    const confirmClean = window.confirm(
+      'Are you sure you want to clean/delete ALL property listings from the catalog? This will completely empty the inventory so you can upload a fresh Excel sheet.'
+    );
+    if (!confirmClean) return;
+    try {
+      setLoading(true);
+      await api('/api/flat-listings/clean/all', { method: 'DELETE' });
+      setListings([]);
+      setStatus('✓ Catalog cleaned successfully! Ready for fresh Excel upload.');
+    } catch (err) {
+      alert(err.message || 'Failed to clean catalog.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     load();
@@ -193,10 +141,84 @@ export default function EmployeeDashboard() {
     return () => clearTimeout(timer);
   }, [status]);
 
+  // View mode for Inventory Catalog (table vs card grid)
+  const [inventoryViewMode, setInventoryViewMode] = useState('table');
+
+  // Excel Upload States
+  const [showExcelModal, setShowExcelModal] = useState(false);
+  const [uploadingExcel, setUploadingExcel] = useState(false);
+  const [excelUploadStatus, setExcelUploadStatus] = useState(null);
+  const [excelFileName, setExcelFileName] = useState('');
+  const [isDraggingExcel, setIsDraggingExcel] = useState(false);
+  const excelFileRef = useRef(null);
+
+  const downloadSampleTemplate = () => {
+    const csvContent =
+      'S.NO,SIZE,FLOOR,PRICE,LOCATION,LIFT,PARKING,ADDRESS,CONTACT,NET PRICE,BY,ADDITIONAL CONTACT / NOTES\n' +
+      '1,50GAJ,G-FS,20L,BHAGWATI GARDEN,NO,BIKE,SPRING MEDOS PUBLIC SCHOOL K BACK SIDE,9560587733,,DHARMENDRA,Front side prime unit\n' +
+      '2,50GAJ,T-BS,22L,MANSHARAM,YES,CAR+BIKE,NEAR METRO PILLAR 750,9811223344,20L,TRIPATHI JI,Top floor with private roof\n' +
+      '3,40GAJ,2ND-BS,15.5L,JAIN ROAD,NO,BIKE,LAXMI ENCLAVE PLOT 12,8287143122,14.5L,ASHISH JI,Ready to move builder floor\n' +
+      '4,60GAJ,1ST-FS,32L,SECTOR 15 DWARKA,YES,CAR,POCKET 4 MAIN ROAD,9319290979,30L,DIRECT OWNER,Brand new luxury finish\n';
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'Property_Inventory_Sample_Template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExcelUpload = async (file) => {
+    if (!file) return;
+    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      setExcelUploadStatus({ type: 'error', msg: 'Please select a valid .xlsx, .xls, or .csv file.' });
+      return;
+    }
+    setExcelFileName(file.name);
+    setUploadingExcel(true);
+    setExcelUploadStatus(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api('/api/excel/bulk-upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const successCount = res.importedCount ?? (res.success ? res.success.length : 0);
+      const failedCount = res.failed ? res.failed.length : 0;
+
+      if (successCount > 0) {
+        setExcelUploadStatus({
+          type: 'success',
+          msg: `✓ Successfully parsed & imported ${successCount} property listing(s) into database!${failedCount > 0 ? ` (${failedCount} empty/skipped rows)` : ''}`,
+        });
+        setStatus(`Successfully imported ${successCount} properties from Excel!`);
+        await load();
+      } else {
+        setExcelUploadStatus({
+          type: 'error',
+          msg: `Upload completed but 0 rows imported. ${res.failed?.[0]?.error || 'Please check that your Excel file contains valid property data (SIZE, PRICE, LOCATION, etc.)'}`,
+        });
+      }
+    } catch (err) {
+      setExcelUploadStatus({
+        type: 'error',
+        msg: err.message || 'Excel upload failed. Check server connection.',
+      });
+    } finally {
+      setUploadingExcel(false);
+    }
+  };
+
   const navItems = [
     { id: 'overview', label: 'Overview', icon: 'ri-dashboard-3-line', activeIcon: 'ri-dashboard-3-fill' },
+    { id: 'list', label: 'Audited Inventory', icon: 'ri-building-line', activeIcon: 'ri-building-fill' },
+    { id: 'excel', label: 'Excel Manager', icon: 'ri-file-excel-2-line', activeIcon: 'ri-file-excel-2-fill' },
     { id: 'add', label: 'Add Property', icon: 'ri-add-circle-line', activeIcon: 'ri-add-circle-fill' },
-    { id: 'list', label: 'Inventory Audit', icon: 'ri-building-line', activeIcon: 'ri-building-fill' },
     { id: 'leads', label: 'Client & Investment Inquiries', icon: 'ri-user-star-line', activeIcon: 'ri-user-star-fill' },
   ];
 
@@ -682,7 +704,7 @@ export default function EmployeeDashboard() {
                         onClick={() => setView('leads')}
                         className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition border border-slate-200 flex items-center gap-1.5 cursor-pointer"
                       >
-                        <i className="ri-user-star-line text-sm text-amber-600" /> Client & Investment Inquiries
+                        <i className="ri-user-star-line text-sm text-amber-600" /> Inquiries
                       </button>
                     </div>
                   </div>
@@ -736,165 +758,203 @@ export default function EmployeeDashboard() {
                 </div>
 
                 {/* 3. Recent Inventory Live Table */}
-                <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-xs space-y-3 w-full">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <div>
-                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Audited Property Inventory</h3>
-                      <p className="text-[10px] text-slate-400">Latest flat listings verified and ready for client pitching</p>
+                <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2.5 w-full">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Audited Property Inventory</h3>
+                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-extrabold font-mono">
+                          {listings.length} Units
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setView('list')}
+                        className="text-[11px] font-black text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer hover:underline"
+                      >
+                        <span>View Full Inventory ({listings.length})</span>
+                        <i className="ri-arrow-right-line" />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setView('list')}
-                      className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>View All ({listings.length})</span>
-                      <i className="ri-arrow-right-line" />
-                    </button>
-                  </div>
 
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                    <table className="w-full text-left text-xs border-collapse select-none">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-black tracking-wider text-slate-400">
-                        <tr>
-                          <th className="py-2.5 px-3">Property Unit</th>
-                          <th className="py-2.5 px-3">Location & Floor</th>
-                          <th className="py-2.5 px-3">Demand Price</th>
-                          <th className="py-2.5 px-3">Owner / Contact</th>
-                          <th className="py-2.5 px-3">Verification</th>
-                          <th className="py-2.5 px-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {listings.slice(0, 8).map((item) => {
-                          const isSold = item.dealStatus === 'sold';
-                          const isRented = item.dealStatus === 'rented';
-                          const isClosed = isSold || isRented;
+                    <div className="overflow-x-auto rounded-xl border border-slate-200/90 max-h-[60vh] overflow-y-auto bg-white shadow-2xs">
+                      <table className="w-full text-left text-xs border-collapse select-none">
+                        <thead className="sticky top-0 z-10 bg-slate-900 border-b border-orange-500 text-[10px] uppercase font-black tracking-wider text-amber-300 shadow-xs">
+                          <tr>
+                            <th className="py-2 px-2 text-white border-r border-slate-700/60 text-center w-10 shrink-0">#</th>
+                            <th className="py-2 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap">SIZE / BHK</th>
+                            <th className="py-2 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap">FLOOR</th>
+                            <th className="py-2 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap">DEMAND PRICE</th>
+                            <th className="py-2 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap">LOCATION</th>
+                            <th className="py-2 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap">CONTACT</th>
+                            <th className="py-2 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap">NET PRICE</th>
+                            <th className="py-2 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap">BY</th>
+                            <th className="py-2 px-2 text-white border-r border-slate-700/60 text-center w-16">STATUS</th>
+                            <th className="py-2 px-2.5 text-right text-white w-24">ACTIONS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
+                          {listings.slice(0, 10).map((item, idx) => {
+                            const isSold = item.dealStatus === 'sold';
+                            const isRented = item.dealStatus === 'rented';
+                            const isClosed = isSold || isRented;
 
-                          return (
-                            <tr
-                              key={item._id}
-                              className={`transition-colors duration-150 select-none ${
-                                isClosed ? 'opacity-35 bg-slate-100/70 pointer-events-none' : 'hover:bg-slate-50/80'
-                              }`}
-                            >
-                              <td className="py-2.5 px-3 max-w-[240px]">
-                                <div className="flex items-center gap-2.5">
-                                  <div
-                                    onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                    className="h-10 w-10 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden border border-slate-200 shadow-2xs cursor-pointer hover:opacity-90 transition"
-                                    title="Click to view photo"
-                                  >
-                                    {item.coverImage ? (
-                                      <img src={item.coverImage} alt="" className="h-full w-full object-cover" />
-                                    ) : (item.images && item.images.length > 0) ? (
-                                      <img src={item.images[0]} alt="" className="h-full w-full object-cover" />
-                                    ) : (
-                                      <span className="text-[10px] font-black text-orange-600">{(item.configuration || '2B').slice(0, 2)}</span>
+                            return (
+                              <tr
+                                key={item._id}
+                                onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
+                                className={`border-b border-slate-200/70 transition-colors duration-100 cursor-pointer ${
+                                  isClosed
+                                    ? 'bg-slate-100/60 text-slate-400'
+                                    : idx % 2 === 0
+                                    ? 'bg-white hover:bg-amber-50/50'
+                                    : 'bg-slate-50/40 hover:bg-amber-50/50'
+                                }`}
+                                title="Click row to inspect complete property details (Address, Lift, Parking, Notes in View)"
+                              >
+                                {/* 1. S.NO */}
+                                <td className="py-1.5 px-2 text-center font-extrabold text-slate-400 font-mono text-[10px] border-r border-slate-200/70">
+                                  {idx + 1}
+                                </td>
+
+                                {/* 2. SIZE */}
+                                <td className="py-1.5 px-2.5 border-r border-slate-200/70 whitespace-nowrap">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 text-[10px] font-black uppercase leading-none">
+                                      {item.configuration || '2 BHK'}
+                                    </span>
+                                    <span className="font-extrabold text-slate-800 text-[11px]">{item.sizeSqft || '50 Gaj'}</span>
+                                  </div>
+                                </td>
+
+                                {/* 3. FLOOR */}
+                                <td className="py-1.5 px-2.5 border-r border-slate-200/70 whitespace-nowrap">
+                                  <span className="font-semibold text-slate-700 text-[11px] block truncate max-w-[130px]" title={item.floor}>
+                                    {item.floor || 'Standard Floor'}
+                                  </span>
+                                </td>
+
+                                {/* 4. PRICE */}
+                                <td className="py-1.5 px-2.5 font-bold border-r border-slate-200/70 whitespace-nowrap">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[11px] font-black text-emerald-800 bg-emerald-50/90 px-1.5 py-0.5 rounded border border-emerald-200/70">
+                                      {priceLabel(item)}
+                                    </span>
+                                    {item.listingType === 'rent' && (
+                                      <span className="text-[8px] font-black uppercase text-blue-600 bg-blue-50 px-1 rounded">Rent</span>
                                     )}
                                   </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <span
-                                        onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                        className="font-bold text-slate-900 block truncate text-xs hover:text-orange-600 cursor-pointer"
-                                      >
-                                        {item.title || `${item.configuration} Builder Floor`}
-                                      </span>
-                                      {isClosed && (
-                                        <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-red-100 text-red-700 uppercase shrink-0">
-                                          {isSold ? 'SOLD' : 'RENTED'}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <span className="text-[10px] text-slate-400 font-mono">
-                                      {item.sizeSqft || '50 Gaj'} · {item.configuration}
-                                    </span>
+                                </td>
+
+                                {/* 5. LOCATION */}
+                                <td className="py-1.5 px-2.5 border-r border-slate-200/70 max-w-[150px]">
+                                  <div className="flex items-center gap-1 font-bold text-slate-800 text-[11px]">
+                                    <i className="ri-map-pin-2-fill text-orange-500 text-xs shrink-0" />
+                                    <span className="truncate" title={item.location}>{item.location}</span>
                                   </div>
-                                </div>
-                              </td>
+                                </td>
 
-                              <td className="py-2.5 px-3">
-                                <span className="font-medium text-slate-800 block text-xs truncate max-w-[160px]">
-                                  {item.location}
-                                </span>
-                                <span className="text-[10px] text-slate-400">
-                                  {item.floor || 'Standard Floor'}
-                                </span>
-                              </td>
+                                {/* 6. CONTACT */}
+                                <td className="py-1.5 px-2.5 border-r border-slate-200/70 whitespace-nowrap">
+                                  {item.ownerContact ? (
+                                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                      <a
+                                        href={`tel:${String(item.ownerContact).replace(/[^\d+]/g, '')}`}
+                                        className="text-[11px] font-mono font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5"
+                                        title="Click to Call"
+                                      >
+                                        <i className="ri-phone-fill text-slate-400 text-xs" />
+                                        <span>{item.ownerContact}</span>
+                                      </a>
+                                      <a
+                                        href={`https://wa.me/91${String(item.ownerContact).replace(/[^\d]/g, '')}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-emerald-600 hover:text-emerald-700"
+                                        title="Open WhatsApp"
+                                      >
+                                        <i className="ri-whatsapp-fill text-xs" />
+                                      </a>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 text-[10px] font-mono">—</span>
+                                  )}
+                                </td>
 
-                              <td className="py-2.5 px-3 font-bold text-slate-900">
-                                <span className="text-xs font-black text-slate-900 block">
-                                  {priceLabel(item)}
-                                </span>
-                                <span className="text-[10px] text-slate-400 uppercase">
-                                  {item.listingType === 'rent' ? 'Rental' : 'Sale'}
-                                </span>
-                              </td>
+                                {/* 7. NET PRICE */}
+                                <td className="py-1.5 px-2.5 border-r border-slate-200/70 whitespace-nowrap">
+                                  <span className={`text-[11px] font-bold ${item.netProfit > 0 ? 'text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/70' : 'text-slate-400'}`}>
+                                    {item.netProfit > 0 ? formatINR(item.netProfit) : '—'}
+                                  </span>
+                                </td>
 
-                              <td className="py-2.5 px-3">
-                                <span className="font-bold text-slate-800 block text-xs">{item.ownerName || 'Direct Party'}</span>
-                                <span className="text-[10px] text-slate-400 font-mono">{item.ownerContact || '—'}</span>
-                              </td>
+                                {/* 8. BY */}
+                                <td className="py-1.5 px-2 border-r border-slate-200/70 whitespace-nowrap">
+                                  <span className="font-bold text-slate-700 text-[11px] block truncate max-w-[90px]" title={item.ownerName || 'Direct'}>
+                                    {item.ownerName || 'Direct'}
+                                  </span>
+                                </td>
 
-                              <td className="py-2.5 px-3">
-                                <button
-                                  type="button"
-                                  disabled={isClosed}
-                                  onClick={() => toggleVerification(item._id, item.isVerified !== false)}
-                                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border ${
-                                    isClosed
-                                      ? 'opacity-40 cursor-not-allowed pointer-events-none bg-slate-100 text-slate-500 border-slate-300'
-                                      : item.isVerified !== false
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 cursor-pointer'
-                                      : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer'
-                                  }`}
-                                >
-                                  <span className={`h-1.5 w-1.5 rounded-full ${item.isVerified !== false ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                                  <span>{item.isVerified !== false ? 'Verified' : 'Pending'}</span>
-                                </button>
-                              </td>
+                                {/* 9. STATUS */}
+                                <td className="py-1.5 px-2 border-r border-slate-200/70 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                  {isClosed ? (
+                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-red-100 text-red-700 uppercase">
+                                      {isSold ? 'SOLD' : 'RENTED'}
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleVerification(item._id, item.isVerified !== false)}
+                                      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider border cursor-pointer ${
+                                        item.isVerified !== false
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                          : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                                      }`}
+                                    >
+                                      <span className={`h-1.5 w-1.5 rounded-full ${item.isVerified !== false ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                      <span>{item.isVerified !== false ? 'Verified' : 'Pending'}</span>
+                                    </button>
+                                  )}
+                                </td>
 
-                              <td className="py-2.5 px-3 text-right">
-                                <div className={`flex items-center justify-end gap-1.5 ${isClosed ? 'pointer-events-none opacity-30 cursor-not-allowed' : ''}`}>
-                                  <button
-                                    type="button"
-                                    disabled={isClosed}
-                                    onClick={() => { setPitchingProperty(item); setPitchClientName(''); setPitchClientPhone(''); }}
-                                    className="px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed transition"
-                                    title="WhatsApp Pitch"
-                                  >
-                                    <i className="ri-whatsapp-line text-xs" />
-                                    <span>Pitch</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={isClosed}
-                                    onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                    className="px-2.5 py-1 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed transition"
-                                    title="View Property & Photos"
-                                  >
-                                    <i className="ri-eye-line text-xs" />
-                                    <span>View</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={isClosed}
-                                    onClick={() => startEdit(item)}
-                                    className="px-2.5 py-1 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed transition"
-                                    title="Edit"
-                                  >
-                                    <i className="ri-edit-line text-xs" />
-                                    <span>Edit</span>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                {/* 10. ACTIONS */}
+                                <td className="py-1.5 px-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      type="button"
+                                      disabled={isClosed}
+                                      onClick={() => { setPitchingProperty(item); setPitchClientName(''); setPitchClientPhone(''); }}
+                                      className="px-1.5 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-0.5 cursor-pointer disabled:opacity-40 transition"
+                                      title="WhatsApp Pitch"
+                                    >
+                                      <i className="ri-whatsapp-fill text-xs" />
+                                      <span>Pitch</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
+                                      className="p-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-bold flex items-center justify-center cursor-pointer transition"
+                                      title="Slide Drawer Details"
+                                    >
+                                      <i className="ri-eye-line text-xs" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => startEdit(item)}
+                                      className="p-1 rounded-md bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-[11px] font-bold flex items-center justify-center cursor-pointer transition"
+                                      title="Edit Listing"
+                                    >
+                                      <i className="ri-edit-line text-xs" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
 
               </div>
             )}
@@ -1039,8 +1099,8 @@ export default function EmployeeDashboard() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
                     <div className="sm:col-span-2 space-y-1.5">
                       <label className="text-[11px] font-bold text-slate-700 block">Unit Configuration</label>
-                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                        {['1 BHK', '2 BHK', '3 BHK', '4 BHK', '1 RK', 'Shop'].map((cfg) => (
+                      <div className="grid grid-cols-3 sm:grid-cols-7 gap-1.5">
+                        {['1 BHK', '2 BHK', '3 BHK', '4 BHK', '1 RK', 'Jad se', 'Shop'].map((cfg) => (
                           <button
                             key={cfg}
                             type="button"
@@ -1558,114 +1618,100 @@ export default function EmployeeDashboard() {
 
             {/* ─── TAB 3: INVENTORY AUDIT / MY LISTINGS ─── */}
             {view === 'list' && (
-              <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-xs space-y-3.5 w-full">
+              <div className="bg-white p-3 sm:p-4 rounded-3xl border border-slate-200/90 shadow-xs space-y-3.5 w-full">
                 
-                {/* 1. Page Heading Header with Live Search Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                {/* 1. Page Heading Header with Live Search Bar & Action Buttons */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-lg font-black shrink-0">
+                    <div className="h-10 w-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-lg font-black shrink-0 shadow-2xs">
                       <i className="ri-building-line" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-sm sm:text-base font-black text-slate-900">Property Inventory & Audit Catalog</h2>
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">Property Inventory & Audit Catalog</h2>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200/60">
                           {filteredListings.length} Units
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400">Manage audited properties</p>
+                      <p className="text-xs text-slate-400 font-medium">Manage audited properties • Excel Import & Live Management</p>
                     </div>
                   </div>
 
-                  {/* Prominent Live Search Bar */}
-                  <div className="relative w-full sm:w-80">
-                    <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
-                    <input
-                      type="text"
-                      value={searchVal}
-                      onChange={(e) => { setSearchVal(e.target.value); setCurrentPage(1); }}
-                      placeholder="Search flat, location, owner, size..."
-                      className="w-full rounded-2xl bg-slate-50 hover:bg-slate-100/80 focus:bg-white pl-8 pr-7 py-2 text-xs text-slate-800 placeholder-slate-400 outline-none border border-slate-200 focus:border-orange-500 transition font-medium shadow-2xs"
-                    />
-                    {searchVal && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchVal('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                      >
-                        <i className="ri-close-line text-xs" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+                  {/* Actions & Search */}
+                  <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+                    {/* Upload Fresh Excel Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowExcelModal(true)}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0"
+                      title="Upload fresh Excel sheet to populate inventory"
+                    >
+                      <i className="ri-file-excel-2-fill text-sm" />
+                      <span>Upload Fresh Excel</span>
+                    </button>
 
-                {/* 2. Filter Ribbon */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
-                  <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                    {['all', 'HK', 'RK', 'Plot', 'Shop'].map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setFilterCategory(cat)}
-                        className={`px-3 py-1 rounded-xl font-bold transition cursor-pointer ${
-                          filterCategory === cat
-                            ? 'bg-orange-600 text-white shadow-2xs'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {cat === 'all' ? 'All Units' : cat}
-                      </button>
-                    ))}
-
-                    <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
-
-                    {['all', 'buy', 'rent'].map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => { setFilterType(t); setFilterPrice('all'); }}
-                        className={`px-2.5 py-1 rounded-xl font-bold transition cursor-pointer ${
-                          filterType === t
-                            ? 'bg-slate-900 text-white shadow-2xs'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {t === 'all' ? 'All Deals' : t === 'buy' ? 'Sale' : 'Rent'}
-                      </button>
-                    ))}
-
-                    <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
-
-                    {/* Price Range Filter Dropdown */}
-                    <div className="flex items-center gap-1">
-                      <select
-                        value={filterPrice}
-                        onChange={(e) => { setFilterPrice(e.target.value); setCurrentPage(1); }}
-                        className={`px-2.5 py-1 rounded-xl text-xs font-bold border transition outline-none cursor-pointer ${
-                          filterPrice !== 'all'
-                            ? 'bg-orange-50 text-orange-800 border-orange-400 font-black ring-1 ring-orange-300'
-                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                      >
-                        <option value="all">💰 All Budgets</option>
-                        <option value="u15">Under ₹15 Lakh {filterType === 'rent' ? '(< ₹10k/mo)' : ''}</option>
-                        <option value="15-25">₹15 L – ₹25 Lakh {filterType === 'rent' ? '(₹10k-₹20k)' : ''}</option>
-                        <option value="25-40">₹25 L – ₹40 Lakh {filterType === 'rent' ? '(₹20k-₹35k)' : ''}</option>
-                        <option value="40-60">₹40 L – ₹60 Lakh {filterType === 'rent' ? '(₹35k-₹50k)' : ''}</option>
-                        <option value="a60">Above ₹60 Lakh {filterType === 'rent' ? '(> ₹50k/mo)' : ''}</option>
-                      </select>
-                      {filterPrice !== 'all' && (
+                    {/* Prominent Live Search Bar */}
+                    <div className="relative flex-1 min-w-[200px] sm:w-64 md:flex-initial">
+                      <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+                      <input
+                        type="text"
+                        value={searchVal}
+                        onChange={(e) => { setSearchVal(e.target.value); setCurrentPage(1); }}
+                        placeholder="Search flat, location, owner..."
+                        className="w-full rounded-2xl bg-slate-50 hover:bg-slate-100/80 focus:bg-white pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none border border-slate-200 focus:border-orange-500 transition font-medium shadow-2xs"
+                      />
+                      {searchVal && (
                         <button
                           type="button"
-                          onClick={() => setFilterPrice('all')}
-                          className="text-[10px] text-orange-600 font-bold hover:underline cursor-pointer px-1"
+                          onClick={() => setSearchVal('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                         >
-                          Reset
+                          <i className="ri-close-line text-xs" />
                         </button>
                       )}
                     </div>
+                  </div>
+                </div>
 
-                    <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
+                {/* 2. Filter Ribbon with Highlighted Budget Selector on Right Corner */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
+                  {/* Left Side: Unit Types, Deal Types & Sort */}
+                  <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                    {/* Unit Categories */}
+                    <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200/80 flex-wrap">
+                      {['all', 'HK', 'RK', 'Plot', 'Shop'].map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setFilterCategory(cat)}
+                          className={`px-2.5 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            filterCategory === cat
+                              ? 'bg-orange-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {cat === 'all' ? 'All Units' : cat}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Deal Types */}
+                    <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200/80">
+                      {['all', 'buy', 'rent'].map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => { setFilterType(t); setFilterPrice('all'); }}
+                          className={`px-2.5 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            filterType === t
+                              ? 'bg-slate-900 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {t === 'all' ? 'All Deals' : t === 'buy' ? 'Sale' : 'Rent'}
+                        </button>
+                      ))}
+                    </div>
 
                     {/* Low to High & High to Low Price Sort Switch */}
                     <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200 shrink-0">
@@ -1695,245 +1741,542 @@ export default function EmployeeDashboard() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Right Side: Highlighted Budget Dropdown & View Mode Switcher */}
+                  <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto">
+                    {/* Highlighted Price Range Filter Dropdown */}
+                    <div className="flex items-center gap-1.5 relative">
+                      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all duration-200 shadow-xs ${
+                        filterPrice !== 'all'
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-orange-600 shadow-orange-500/20 shadow-md ring-2 ring-orange-400/40'
+                          : 'bg-amber-50/90 hover:bg-amber-100/90 text-amber-950 border-amber-300 ring-1 ring-amber-400/30'
+                      }`}>
+                        <i className={`ri-money-rupee-circle-fill text-sm ${filterPrice !== 'all' ? 'text-white' : 'text-amber-600'}`} />
+                        <select
+                          value={filterPrice}
+                          onChange={(e) => { setFilterPrice(e.target.value); setCurrentPage(1); }}
+                          className={`text-xs font-black bg-transparent outline-none cursor-pointer pr-1 ${
+                            filterPrice !== 'all' ? 'text-white font-black' : 'text-amber-950 font-bold'
+                          }`}
+                        >
+                          <option value="all" className="bg-white text-slate-800">💰 All Budgets</option>
+                          <option value="u15" className="bg-white text-slate-800">Under ₹15 Lakh {filterType === 'rent' ? '(< ₹10k/mo)' : ''}</option>
+                          <option value="15-25" className="bg-white text-slate-800">₹15 L – ₹25 Lakh {filterType === 'rent' ? '(₹10k-₹20k)' : ''}</option>
+                          <option value="25-40" className="bg-white text-slate-800">₹25 L – ₹40 Lakh {filterType === 'rent' ? '(₹20k-₹35k)' : ''}</option>
+                          <option value="40-60" className="bg-white text-slate-800">₹40 L – ₹60 Lakh {filterType === 'rent' ? '(₹35k-₹50k)' : ''}</option>
+                          <option value="a60" className="bg-white text-slate-800">Above ₹60 Lakh {filterType === 'rent' ? '(> ₹50k/mo)' : ''}</option>
+                        </select>
+                      </div>
+
+                      {filterPrice !== 'all' && (
+                        <button
+                          type="button"
+                          onClick={() => setFilterPrice('all')}
+                          className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-black cursor-pointer transition shadow-2xs"
+                          title="Reset Budget Filter"
+                        >
+                          ✕ Reset
+                        </button>
+                      )}
+                    </div>
+
+                    {/* View Mode Toggle (Table / Card Grid) */}
+                    <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setInventoryViewMode('table')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                          inventoryViewMode === 'table'
+                            ? 'bg-slate-900 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Dense Table View"
+                      >
+                        <i className="ri-table-line text-xs" />
+                        <span>Table</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInventoryViewMode('grid')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                          inventoryViewMode === 'grid'
+                            ? 'bg-slate-900 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Responsive Cards View"
+                      >
+                        <i className="ri-grid-fill text-xs" />
+                        <span>Cards</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                {/* 3. Table View with Deal Status Switch at Last Position */}
-                <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                  <table className="w-full text-left text-xs border-collapse select-none">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-black tracking-wider text-slate-400">
-                      <tr>
-                        <th className="py-2.5 px-3">Unit / Heading</th>
-                        <th className="py-2.5 px-3">Location & Floor</th>
-                        <th className="py-2.5 px-3">Price & Terms</th>
-                        <th className="py-2.5 px-3">Owner Contact</th>
-                        <th className="py-2.5 px-3">Verification</th>
-                        <th className="py-2.5 px-3">Actions</th>
-                        <th className="py-2.5 px-3 text-right">Deal Status Switch</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {paginatedListings.map((item) => {
-                        const isSold = item.dealStatus === 'sold';
-                        const isRented = item.dealStatus === 'rented';
-                        const isClosed = isSold || isRented;
-                        const isForRent = item.listingType === 'rent';
+                {/* 3. Empty State (Common for both Views) */}
+                {paginatedListings.length === 0 ? (
+                  <div className="py-14 text-center">
+                    <div className="max-w-md mx-auto flex flex-col items-center justify-center text-center p-6 bg-slate-50/70 rounded-3xl border border-dashed border-slate-300">
+                      <div className="h-14 w-14 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-2xl mb-3 shadow-2xs">
+                        <i className="ri-folder-open-line" />
+                      </div>
+                      <h3 className="text-sm font-black text-slate-800">Inventory is Clean & Empty</h3>
+                      <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
+                        No property listings match the current filters or database is empty. Upload your fresh Excel sheet to instantly populate the inventory with exact data.
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setShowExcelModal(true)}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <i className="ri-file-excel-2-fill text-sm" />
+                          <span>Upload Fresh Excel Sheet</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setView('add')}
+                          className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-xs transition inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <i className="ri-add-line text-sm" />
+                          <span>Add Listing Manually</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : inventoryViewMode === 'grid' ? (
+                  /* ─── CARD GRID VIEW (100% RESPONSIVE) ─── */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 pt-1">
+                    {paginatedListings.map((item, idx) => {
+                      const isSold = item.dealStatus === 'sold';
+                      const isRented = item.dealStatus === 'rented';
+                      const isClosed = isSold || isRented;
+                      const isForRent = item.listingType === 'rent';
 
-                        return (
-                          <tr
-                            key={item._id}
-                            className={`transition-colors duration-150 select-none ${
-                              isClosed ? 'bg-slate-100/70' : 'hover:bg-slate-50/80'
-                            }`}
-                          >
-                            <td className={`py-2.5 px-3 max-w-[260px] ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                              <div className="flex items-center gap-2.5">
-                                <div
-                                  onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                  className="h-10 w-10 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden border border-slate-200 shadow-2xs cursor-pointer hover:opacity-90 transition"
-                                  title="Click to view photo"
-                                >
-                                  {item.coverImage ? (
-                                    <img src={item.coverImage} alt="" className="h-full w-full object-cover" />
-                                  ) : (item.images && item.images.length > 0) ? (
-                                    <img src={item.images[0]} alt="" className="h-full w-full object-cover" />
-                                  ) : (
-                                    <span className="text-[10px] font-black text-orange-600">{(item.configuration || '2B').slice(0, 2)}</span>
-                                  )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span
-                                      onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                      className="font-bold text-slate-900 block truncate text-xs hover:text-orange-600 cursor-pointer"
-                                    >
-                                      {item.title || `${item.configuration} Builder Floor`}
-                                    </span>
-                                    {isClosed && (
-                                      <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-red-100 text-red-700 uppercase shrink-0">
-                                        {isSold ? 'SOLD' : 'RENTED'}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-[10px] text-slate-400 font-mono">
-                                    {item.sizeSqft || '50 Gaj'} · {item.configuration}
+                      return (
+                        <div
+                          key={item._id}
+                          onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
+                          className={`rounded-2xl border transition-all duration-200 cursor-pointer p-3.5 flex flex-col justify-between relative group ${
+                            isClosed
+                              ? 'bg-slate-50/70 border-slate-200 opacity-60'
+                              : 'bg-white border-slate-200 hover:border-orange-400 hover:shadow-md'
+                          }`}
+                        >
+                          {/* Card Header */}
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                                  #{(currentPage - 1) * PAGE_SIZE + idx + 1}
+                                </span>
+                                {item.configuration && (
+                                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">
+                                    {item.configuration}
                                   </span>
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className={`py-2.5 px-3 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                              <span className="font-medium text-slate-800 block text-xs truncate max-w-[160px]">
-                                {item.location}
-                              </span>
-                              <span className="text-[10px] text-slate-400">
-                                {item.floor || 'Standard'}
-                              </span>
-                            </td>
-
-                            <td className={`py-2.5 px-3 font-bold text-slate-900 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                              <span className="text-xs font-black text-slate-900 block">
-                                {priceLabel(item)}
-                              </span>
-                              <span className="text-[10px] text-slate-400 uppercase">
-                                {item.listingType === 'rent' ? 'Rental' : 'Sale'}
-                              </span>
-                            </td>
-
-                            <td className={`py-2.5 px-3 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                              <span className="font-bold text-slate-800 block text-xs">{item.ownerName || 'Direct'}</span>
-                              <span className="text-[10px] text-slate-400 font-mono">{item.ownerContact || '—'}</span>
-                            </td>
-
-                            {/* Verification Button (Frozen if Closed) */}
-                            <td className={`py-2.5 px-3 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                              <button
-                                type="button"
-                                disabled={isClosed}
-                                onClick={() => toggleVerification(item._id, item.isVerified !== false)}
-                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border ${
-                                  isClosed
-                                    ? 'opacity-40 cursor-not-allowed pointer-events-none bg-slate-100 text-slate-500 border-slate-300'
-                                    : item.isVerified !== false
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 cursor-pointer'
-                                    : 'bg-amber-50 text-amber-700 border-amber-200 cursor-pointer'
-                                }`}
-                              >
-                                <span className={`h-1.5 w-1.5 rounded-full ${item.isVerified !== false ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                                <span>{item.isVerified !== false ? 'Verified' : 'Pending'}</span>
-                              </button>
-                            </td>
-
-                            {/* Actions Buttons (Frozen if Closed) */}
-                            <td className={`py-2.5 px-3 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                              <div className={`flex items-center gap-1.5 ${isClosed ? 'pointer-events-none opacity-30 cursor-not-allowed' : ''}`}>
-                                <button
-                                  type="button"
-                                  disabled={isClosed}
-                                  onClick={() => { setPitchingProperty(item); setPitchClientName(''); setPitchClientPhone(''); }}
-                                  className="px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed transition"
-                                  title="WhatsApp Pitch"
-                                >
-                                  <i className="ri-whatsapp-line text-xs" />
-                                  <span>Pitch</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isClosed}
-                                  onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                  className="px-2.5 py-1 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed transition"
-                                  title="View Property & Photos"
-                                >
-                                  <i className="ri-eye-line text-xs" />
-                                  <span>View</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isClosed}
-                                  onClick={() => startEdit(item)}
-                                  className="px-2.5 py-1 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed transition"
-                                  title="Edit"
-                                >
-                                  <i className="ri-edit-line text-xs" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isClosed}
-                                  onClick={() => deleteListing(item._id)}
-                                  className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-700 border border-slate-200 hover:border-red-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer disabled:cursor-not-allowed transition"
-                                  title="Delete"
-                                >
-                                  <i className="ri-delete-bin-line text-xs" />
-                                  <span>Delete</span>
-                                </button>
-                              </div>
-                            </td>
-
-                            {/* Deal Switch Column (Always interactive & 100% opacity so deal can be reopened) */}
-                            <td className="py-2.5 px-3 text-right pointer-events-auto">
-                              <div className="flex items-center justify-end gap-1.5">
-                                {isForRent ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleDealStatus(item)}
-                                      className={`group relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none shadow-xs ${
-                                        isRented ? 'bg-red-600 ring-2 ring-red-300' : 'bg-emerald-500'
-                                      }`}
-                                      title={isRented ? 'Deal is closed. Click to unfreeze & mark as Available (Unrented)' : 'Click to close deal & mark as Rented'}
-                                    >
-                                      <span
-                                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                                          isRented ? 'translate-x-4' : 'translate-x-0'
-                                        }`}
-                                      />
-                                    </button>
-                                    <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ${
-                                      isRented
-                                        ? 'bg-red-100 text-red-800 border border-red-300'
-                                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                    }`}>
-                                      {isRented ? 'Rented' : 'Available'}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleDealStatus(item)}
-                                      className={`group relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none shadow-xs ${
-                                        isSold ? 'bg-red-600 ring-2 ring-red-300' : 'bg-emerald-500'
-                                      }`}
-                                      title={isSold ? 'Deal is closed. Click to unfreeze & mark as Available (Unsold)' : 'Click to close deal & mark as Sold'}
-                                    >
-                                      <span
-                                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                                          isSold ? 'translate-x-4' : 'translate-x-0'
-                                        }`}
-                                      />
-                                    </button>
-                                    <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ${
-                                      isSold
-                                        ? 'bg-red-100 text-red-800 border border-red-300'
-                                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                    }`}>
-                                      {isSold ? 'Sold' : 'Available'}
-                                    </span>
-                                  </>
+                                )}
+                                {item.sizeSqft && (
+                                  <span className="text-[11px] font-extrabold text-slate-700">
+                                    {item.sizeSqft}
+                                  </span>
                                 )}
                               </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
 
-                {/* Pagination */}
+                              {/* Deal status switch */}
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleDealStatus(item)}
+                                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase tracking-wider transition ${
+                                    isClosed
+                                      ? 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
+                                      : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                                  }`}
+                                  title={isClosed ? 'Click to unfreeze & mark Active' : `Click to mark ${isForRent ? 'Rented' : 'Sold'}`}
+                                >
+                                  <span className={`h-2 w-2 rounded-full ${isClosed ? 'bg-rose-600' : 'bg-emerald-600 animate-pulse'}`} />
+                                  <span>{isClosed ? (isSold ? 'SOLD' : 'RENTED') : 'ACTIVE'}</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Price & Listing Type */}
+                            <div className="flex items-baseline justify-between gap-2 mt-1 mb-2">
+                              <span className="text-base font-black text-emerald-700">
+                                {priceLabel(item)}
+                              </span>
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                                isForRent ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {isForRent ? 'FOR RENT' : 'FOR SALE'}
+                              </span>
+                            </div>
+
+                            {/* Location & Address */}
+                            <div className="space-y-1 mb-2.5">
+                              <div className="flex items-center gap-1 text-xs font-black text-slate-800">
+                                <i className="ri-map-pin-2-fill text-orange-500 shrink-0 text-sm" />
+                                <span className="truncate">{item.location || 'Location Not Specified'}</span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 font-medium line-clamp-2 pl-4">
+                                {item.completeAddress || item.title || '—'}
+                              </p>
+                            </div>
+
+                            {/* Badges / Specs row */}
+                            <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-bold mb-3">
+                              {item.floor && (
+                                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                                  🏢 {item.floor}
+                                </span>
+                              )}
+                              {item.lift && (
+                                <span className={`px-2 py-0.5 rounded ${
+                                  item.lift === 'YES' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'
+                                }`}>
+                                  🛗 Lift: {item.lift}
+                                </span>
+                              )}
+                              {item.parking && (
+                                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                  🚗 {item.parking}
+                                </span>
+                              )}
+                              {item.netProfit > 0 && (
+                                <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-mono">
+                                  Net: {formatINR(item.netProfit)}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Owner Info & Contact Links */}
+                            {item.ownerContact && (
+                              <div
+                                className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/80 mb-3 text-xs"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <span className="font-bold text-slate-700 truncate max-w-[120px]" title={item.ownerName || 'Owner'}>
+                                  👤 {item.ownerName || 'Owner'}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <a
+                                    href={`tel:${String(item.ownerContact).replace(/[^\d+]/g, '')}`}
+                                    className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center gap-1 transition"
+                                  >
+                                    <i className="ri-phone-fill text-xs" />
+                                    <span>Call</span>
+                                  </a>
+                                  <a
+                                    href={`https://wa.me/91${String(item.ownerContact).replace(/[^\d]/g, '')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center gap-1 transition"
+                                  >
+                                    <i className="ri-whatsapp-fill text-xs" />
+                                    <span>WhatsApp</span>
+                                  </a>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Card Footer Actions */}
+                          <div
+                            className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              disabled={isClosed}
+                              onClick={() => { setPitchingProperty(item); setPitchClientName(''); setPitchClientPhone(''); }}
+                              className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer disabled:opacity-40"
+                            >
+                              <i className="ri-whatsapp-line" />
+                              <span>Pitch</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                              title="Inspect Details"
+                            >
+                              <i className="ri-eye-line text-sm" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isClosed}
+                              onClick={() => startEdit(item)}
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-orange-50 text-slate-700 hover:text-orange-600 text-xs font-bold transition flex items-center justify-center cursor-pointer disabled:opacity-40"
+                              title="Edit Property"
+                            >
+                              <i className="ri-edit-line text-sm" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isClosed}
+                              onClick={() => deleteListing(item._id)}
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 text-xs font-bold transition flex items-center justify-center cursor-pointer disabled:opacity-40"
+                              title="Delete Property"
+                            >
+                              <i className="ri-delete-bin-line text-sm" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* ─── DENSE FULLY RESPONSIVE TABLE VIEW ─── */
+                  <div className="w-full space-y-1">
+                    {/* Mobile swipe helper */}
+                    <div className="lg:hidden flex items-center justify-between px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-500 font-medium">
+                      <span className="flex items-center gap-1.5">
+                        <i className="ri-drag-move-2-line text-orange-500 text-xs" />
+                        Swipe horizontally to view all columns
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setInventoryViewMode('grid')}
+                        className="text-orange-600 font-bold hover:underline cursor-pointer"
+                      >
+                        Switch to Cards
+                      </button>
+                    </div>
+
+                    <div className="w-full overflow-x-auto rounded-2xl border border-slate-200/90 max-h-[72vh] overflow-y-auto bg-white shadow-xs">
+                      <table className="w-full text-left text-xs border-collapse select-none">
+                        <thead className="sticky top-0 z-10 bg-slate-900 border-b-2 border-orange-500 text-[10px] uppercase font-black tracking-wider text-amber-300 shadow-xs">
+                          <tr>
+                            <th className="py-2.5 px-2 text-white border-r border-slate-700/60 text-center w-12 shrink-0">#</th>
+                            <th className="py-2.5 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap w-28">SIZE / BHK</th>
+                            <th className="py-2.5 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap w-28">FLOOR</th>
+                            <th className="py-2.5 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap w-32">DEMAND PRICE</th>
+                            <th className="py-2.5 px-2.5 text-white border-r border-slate-700/60 min-w-[140px]">LOCATION</th>
+                            <th className="py-2.5 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap w-36">CONTACT</th>
+                            <th className="py-2.5 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap w-28">NET PRICE</th>
+                            <th className="py-2.5 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap w-28">BY</th>
+                            <th className="py-2.5 px-2.5 text-center text-white border-r border-slate-700/60 w-32 shrink-0">ACTIONS</th>
+                            <th className="py-2.5 px-3 text-right text-white whitespace-nowrap w-36 shrink-0">DEAL SWITCH</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
+                          {paginatedListings.map((item, idx) => {
+                            const isSold = item.dealStatus === 'sold';
+                            const isRented = item.dealStatus === 'rented';
+                            const isClosed = isSold || isRented;
+                            const isForRent = item.listingType === 'rent';
+
+                            return (
+                              <tr
+                                key={item._id}
+                                onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
+                                className={`border-b border-slate-200/70 transition-colors duration-100 cursor-pointer ${
+                                  isClosed
+                                    ? 'bg-slate-100/60 text-slate-400'
+                                    : idx % 2 === 0
+                                    ? 'bg-white hover:bg-amber-50/50'
+                                    : 'bg-slate-50/40 hover:bg-amber-50/50'
+                                }`}
+                                title="Click row to inspect complete property details (Address, Lift, Parking, Notes in View)"
+                              >
+                                {/* 1. S.NO */}
+                                <td className="py-2 px-2 text-center font-extrabold text-slate-400 font-mono text-[10px] border-r border-slate-200/70">
+                                  {(currentPage - 1) * PAGE_SIZE + idx + 1}
+                                </td>
+
+                                {/* 2. SIZE */}
+                                <td className={`py-2 px-2.5 border-r border-slate-200/70 whitespace-nowrap ${isClosed ? 'opacity-50' : ''}`}>
+                                  <div className="flex items-center gap-1.5">
+                                    {item.configuration && (
+                                      <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 text-[10px] font-black uppercase leading-none">
+                                        {item.configuration}
+                                      </span>
+                                    )}
+                                    <span className="font-extrabold text-slate-800 text-[11px]">{item.sizeSqft || (item.configuration ? '' : '—')}</span>
+                                  </div>
+                                </td>
+
+                                {/* 3. FLOOR */}
+                                <td className={`py-2 px-2.5 border-r border-slate-200/70 whitespace-nowrap ${isClosed ? 'opacity-50' : ''}`}>
+                                  <span className="font-semibold text-slate-700 text-[11px] block truncate max-w-[130px]" title={item.floor || '—'}>
+                                    {item.floor || '—'}
+                                  </span>
+                                </td>
+
+                                {/* 4. PRICE */}
+                                <td className={`py-2 px-2.5 font-bold border-r border-slate-200/70 whitespace-nowrap ${isClosed ? 'opacity-50' : ''}`}>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[11px] font-black text-emerald-800 bg-emerald-50/90 px-1.5 py-0.5 rounded border border-emerald-200/70">
+                                      {priceLabel(item)}
+                                    </span>
+                                    {item.listingType === 'rent' && (
+                                      <span className="text-[8px] font-black uppercase text-blue-600 bg-blue-50 px-1 rounded">Rent</span>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* 5. LOCATION */}
+                                <td className={`py-2 px-2.5 border-r border-slate-200/70 ${isClosed ? 'opacity-50' : ''}`}>
+                                  <div className="flex items-center gap-1 font-bold text-slate-800 text-[11px]">
+                                    {item.location && <i className="ri-map-pin-2-fill text-orange-500 text-xs shrink-0" />}
+                                    <span className="truncate max-w-[160px]" title={item.location || '—'}>{item.location || '—'}</span>
+                                  </div>
+                                </td>
+
+                                {/* 6. CONTACT */}
+                                <td className={`py-2 px-2.5 border-r border-slate-200/70 whitespace-nowrap ${isClosed ? 'opacity-50' : ''}`}>
+                                  {item.ownerContact ? (
+                                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                      <a
+                                        href={`tel:${String(item.ownerContact).replace(/[^\d+]/g, '')}`}
+                                        className="text-[11px] font-mono font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5"
+                                        title="Click to Call"
+                                      >
+                                        <i className="ri-phone-fill text-slate-400 text-xs" />
+                                        <span>{item.ownerContact}</span>
+                                      </a>
+                                      <a
+                                        href={`https://wa.me/91${String(item.ownerContact).replace(/[^\d]/g, '')}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-emerald-600 hover:text-emerald-700"
+                                        title="Open WhatsApp"
+                                      >
+                                        <i className="ri-whatsapp-fill text-xs" />
+                                      </a>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 text-[10px] font-mono">—</span>
+                                  )}
+                                </td>
+
+                                {/* 7. NET PRICE */}
+                                <td className={`py-2 px-2.5 border-r border-slate-200/70 whitespace-nowrap ${isClosed ? 'opacity-50' : ''}`}>
+                                  <span className={`text-[11px] font-bold ${item.netProfit > 0 ? 'text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/70' : 'text-slate-400'}`}>
+                                    {item.netProfit > 0 ? formatINR(item.netProfit) : '—'}
+                                  </span>
+                                </td>
+
+                                {/* 8. BY */}
+                                <td className={`py-2 px-2 border-r border-slate-200/70 whitespace-nowrap ${isClosed ? 'opacity-50' : ''}`}>
+                                  <span className="font-bold text-slate-700 text-[11px] block truncate max-w-[90px]" title={item.ownerName || '—'}>
+                                    {item.ownerName || '—'}
+                                  </span>
+                                </td>
+
+                                {/* 9. ACTIONS */}
+                                <td className="py-2 px-2 text-center border-r border-slate-200/70 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
+                                      className="p-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-bold flex items-center justify-center cursor-pointer transition"
+                                      title="View Complete Details (Address, Specs, Lift, Parking, Notes)"
+                                    >
+                                      <i className="ri-eye-line text-xs" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isClosed}
+                                      onClick={() => { setPitchingProperty(item); setPitchClientName(''); setPitchClientPhone(''); }}
+                                      className="px-1.5 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-0.5 cursor-pointer disabled:opacity-40 transition"
+                                      title="WhatsApp Pitch"
+                                    >
+                                      <i className="ri-whatsapp-fill text-xs" />
+                                      <span className="hidden xl:inline">Pitch</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isClosed}
+                                      onClick={() => startEdit(item)}
+                                      className="p-1 rounded-md bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-[11px] font-bold flex items-center justify-center cursor-pointer disabled:opacity-40 transition"
+                                      title="Edit Listing"
+                                    >
+                                      <i className="ri-edit-line text-xs" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isClosed}
+                                      onClick={() => deleteListing(item._id)}
+                                      className="p-1 rounded-md bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-700 border border-slate-200 hover:border-red-200 text-[11px] font-bold flex items-center justify-center cursor-pointer disabled:opacity-40 transition"
+                                      title="Delete Listing"
+                                    >
+                                      <i className="ri-delete-bin-line text-xs" />
+                                    </button>
+                                  </div>
+                                </td>
+
+                                {/* 10. DEAL STATUS SWITCH (Professional Toggle) */}
+                                <td className="py-2 px-3 text-right pointer-events-auto whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleDealStatus(item)}
+                                      className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-lg border transition-all duration-150 cursor-pointer shadow-2xs font-mono select-none ${
+                                        isClosed
+                                          ? 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
+                                          : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                                      }`}
+                                      title={isClosed ? 'Deal is closed. Click to unfreeze & mark as Active (Available)' : `Click to mark as ${isForRent ? 'Rented' : 'Sold'}`}
+                                    >
+                                      {/* Pixel-perfect toggle track */}
+                                      <div className={`relative flex items-center h-4 w-7 shrink-0 rounded-full px-0.5 transition-colors duration-200 ${
+                                        isClosed ? 'bg-rose-600' : 'bg-emerald-600'
+                                      }`}>
+                                        <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-xs transition-transform duration-200 ${
+                                          isClosed ? 'translate-x-0' : 'translate-x-3'
+                                        }`} />
+                                      </div>
+                                      <span className="text-[10px] font-black uppercase tracking-wider min-w-[44px] text-left">
+                                        {isClosed ? (isSold ? 'SOLD' : 'RENTED') : 'ACTIVE'}
+                                      </span>
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Responsive Pagination */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                    <span className="text-slate-400">Page {currentPage} of {totalPages}</span>
-                    <div className="flex items-center gap-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+                    <span className="text-slate-400 font-medium">
+                      Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredListings.length)} of {filteredListings.length} units (Page {currentPage} of {totalPages})
+                    </span>
+                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
                       <button
                         type="button"
                         disabled={currentPage <= 1}
                         onClick={() => setCurrentPage((p) => p - 1)}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs disabled:opacity-40 cursor-pointer"
+                        className="px-3 py-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold disabled:opacity-40 cursor-pointer shadow-2xs transition"
                       >
-                        Prev
+                        <i className="ri-arrow-left-s-line" /> Prev
                       </button>
+                      <span className="px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 font-black text-xs font-mono">
+                        {currentPage} / {totalPages}
+                      </span>
                       <button
                         type="button"
                         disabled={currentPage >= totalPages}
                         onClick={() => setCurrentPage((p) => p + 1)}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs disabled:opacity-40 cursor-pointer"
+                        className="px-3 py-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold disabled:opacity-40 cursor-pointer shadow-2xs transition"
                       >
-                        Next
+                        Next <i className="ri-arrow-right-s-line" />
                       </button>
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ─── TAB: EXCEL IMPORT & SYNC ─── */}
+            {view === 'excel' && (
+              <div className="w-full space-y-3">
+                <AdminExcelView />
               </div>
             )}
 
@@ -2276,164 +2619,359 @@ export default function EmployeeDashboard() {
         </div>
       )}
 
-      {/* ─── MODAL: PROPERTY DETAIL & IMAGE INSPECTOR ─── */}
+      {/* ─── SLIDE DRAWER: PROPERTY COMPLETE DETAILS & INSPECTOR ─── */}
       {viewingProperty && (() => {
         const allPhotos = [
           viewingProperty.coverImage,
           ...(Array.isArray(viewingProperty.images) ? viewingProperty.images : [])
         ].filter(Boolean);
 
+        const rawPrice = viewingProperty.listingType === 'rent'
+          ? Number(viewingProperty.monthlyRent) || 0
+          : Number(viewingProperty.salePrice) || 0;
+        const netPrice = Number(viewingProperty.netProfit) || 0;
+        const margin = (rawPrice > 0 && netPrice > 0 && rawPrice > netPrice) ? rawPrice - netPrice : 0;
+
+        // Parse amenities into chips
+        const amenitiesList = (viewingProperty.amenities || '')
+          .split(/[,|\n]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+
         return (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-            <div className="bg-white rounded-3xl border border-slate-200 max-w-xl w-full p-4 sm:p-5 shadow-2xl space-y-3.5 animate-in fade-in zoom-in-95 duration-150 my-auto max-h-[92vh] overflow-y-auto">
-              {/* Header */}
-              <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-                <div className="min-w-0 flex-1 pr-2">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-2 py-0.5 rounded-md bg-orange-100 text-orange-800 text-[10px] font-black uppercase">
+          <div
+            className="fixed inset-0 z-50 overflow-hidden bg-slate-950/70 backdrop-blur-xs flex justify-end transition-opacity duration-300 animate-in fade-in"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setViewingProperty(null);
+                setActivePhotoIdx(0);
+              }
+            }}
+          >
+            <div className="w-full max-w-xl sm:max-w-2xl bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 overflow-hidden transform transition-transform duration-300 ease-out animate-in slide-in-from-right font-['Inter',sans-serif]">
+              {/* Top Drawer Header */}
+              <div className="px-5 py-4 bg-white border-b border-slate-200 flex items-start justify-between gap-4 sticky top-0 z-20 shadow-2xs">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                    <span className="px-2.5 py-0.5 rounded-md bg-orange-600 text-white text-[10px] font-black uppercase tracking-wide shadow-2xs">
                       {viewingProperty.configuration || '2 BHK'}
                     </span>
-                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold uppercase">
+                    <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-100 text-[10px] font-bold uppercase">
                       {viewingProperty.propertyCategory || 'Flat'}
                     </span>
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase">
+                    <span
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                        viewingProperty.listingType === 'rent'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
                       {viewingProperty.listingType === 'rent' ? 'For Rent' : 'For Sale'}
                     </span>
-                    {viewingProperty.dealStatus && viewingProperty.dealStatus !== 'available' && (
-                      <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 text-[10px] font-black uppercase">
+                    {viewingProperty.dealStatus && (
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                          viewingProperty.dealStatus === 'available'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-red-100 text-red-700'
+                        }`}
+                      >
                         {viewingProperty.dealStatus}
                       </span>
                     )}
+                    {viewingProperty.isVerified !== false && (
+                      <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold flex items-center gap-1">
+                        <i className="ri-verified-badge-fill text-sky-500 text-xs" /> Verified Listing
+                      </span>
+                    )}
                   </div>
-                  <h3 className="text-sm sm:text-base font-black text-slate-900 mt-1 truncate">
-                    {viewingProperty.title || `${viewingProperty.configuration} in ${viewingProperty.location}`}
-                  </h3>
-                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                    <i className="ri-map-pin-2-fill text-orange-500 text-xs" />
-                    <span className="truncate">{viewingProperty.location}</span>
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug truncate">
+                    {viewingProperty.title || `${viewingProperty.configuration} in ${viewingProperty.location || 'Delhi NCR'}`}
+                  </h2>
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+                    <i className="ri-map-pin-2-fill text-orange-500 text-sm" />
+                    <span className="font-semibold text-slate-700 truncate">{viewingProperty.location || 'Location Not Specified'}</span>
+                    {viewingProperty.sizeSqft && (
+                      <>
+                        <span className="text-slate-300">•</span>
+                        <span className="font-bold text-slate-600">{viewingProperty.sizeSqft}</span>
+                      </>
+                    )}
                   </p>
                 </div>
+
+                {/* Close Button */}
                 <button
                   type="button"
                   onClick={() => { setViewingProperty(null); setActivePhotoIdx(0); }}
-                  className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer shrink-0"
+                  className="h-9 w-9 rounded-full bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200 hover:border-red-200"
+                  title="Close Drawer"
                 >
-                  <i className="ri-close-line text-lg" />
+                  <i className="ri-close-line text-xl" />
                 </button>
               </div>
 
-              {/* Photo Showcase & Image Gallery */}
-              <div className="space-y-2">
-                {allPhotos.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="relative h-56 sm:h-64 w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 shadow-inner group">
-                      <img
-                        src={allPhotos[activePhotoIdx] || allPhotos[0]}
-                        alt="Property Preview"
-                        className="h-full w-full object-contain sm:object-cover"
-                      />
-                      <span className="absolute top-2 left-2 px-2.5 py-1 rounded-lg bg-black/70 text-white font-mono text-[10px] font-bold backdrop-blur-xs">
-                        Photo {activePhotoIdx + 1} of {allPhotos.length}
+              {/* Scrollable Drawer Content */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/60">
+                {/* 1. Photo Showcase & Carousel */}
+                <div className="space-y-2.5">
+                  {allPhotos.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="relative h-64 sm:h-72 w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 shadow-md group">
+                        <img
+                          src={allPhotos[activePhotoIdx] || allPhotos[0]}
+                          alt="Property Showcase"
+                          className="h-full w-full object-contain sm:object-cover transition duration-300"
+                        />
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                          <span className="px-2.5 py-1 rounded-lg bg-black/75 text-white font-mono text-[11px] font-bold backdrop-blur-md shadow-sm">
+                            Photo {activePhotoIdx + 1} of {allPhotos.length}
+                          </span>
+                        </div>
+                        <div className="absolute top-3 right-3">
+                          <span className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 text-white text-sm font-black shadow-lg">
+                            {priceLabel(viewingProperty)}
+                          </span>
+                        </div>
+
+                        {allPhotos.length > 1 && (
+                          <div className="absolute inset-y-0 inset-x-2 flex items-center justify-between pointer-events-none">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActivePhotoIdx((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1));
+                              }}
+                              className="pointer-events-auto h-8 w-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-xs transition cursor-pointer shadow-md"
+                            >
+                              <i className="ri-arrow-left-s-line text-lg" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActivePhotoIdx((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0));
+                              }}
+                              className="pointer-events-auto h-8 w-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-xs transition cursor-pointer shadow-md"
+                            >
+                              <i className="ri-arrow-right-s-line text-lg" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Thumbnail selector */}
+                      {allPhotos.length > 1 && (
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
+                          {allPhotos.map((img, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setActivePhotoIdx(idx)}
+                              className={`relative h-14 w-16 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${
+                                activePhotoIdx === idx
+                                  ? 'border-orange-600 ring-2 ring-orange-300 scale-105'
+                                  : 'border-slate-200 opacity-60 hover:opacity-100'
+                              }`}
+                            >
+                              <img src={img} alt="" className="h-full w-full object-cover" />
+                              <span className="absolute bottom-0 right-0 px-1 rounded-tl bg-black/70 text-white text-[8px] font-bold">
+                                #{idx + 1}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="h-36 w-full rounded-2xl bg-gradient-to-br from-white to-orange-50/50 border border-dashed border-orange-200 flex flex-col items-center justify-center text-slate-400 gap-2 shadow-2xs">
+                      <div className="h-10 w-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-xl shadow-xs">
+                        <i className="ri-image-add-line" />
+                      </div>
+                      <div className="text-center">
+                        <span className="text-xs font-bold text-slate-700 block">No Property Photos Attached</span>
+                        <span className="text-[11px] text-slate-400 block">Edit listing to add verified high-res site photos</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Financial Overview Grid */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <i className="ri-money-rupee-circle-line text-emerald-600 text-base" /> Pricing & Financial Terms
+                    </h4>
+                    {margin > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black">
+                        Direct Margin: {formatINR(margin)}
                       </span>
-                      <span className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-orange-600 text-white text-xs font-black shadow-md">
-                        {priceLabel(viewingProperty)}
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Demand Price</span>
+                      <span className="text-base font-black text-emerald-700 block mt-0.5">{priceLabel(viewingProperty)}</span>
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Net Deal / Bottom</span>
+                      <span className="text-base font-black text-amber-700 block mt-0.5">
+                        {netPrice > 0 ? formatINR(netPrice) : 'Firm Demand'}
                       </span>
                     </div>
 
-                    {allPhotos.length > 1 && (
-                      <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5">
-                        {allPhotos.map((img, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setActivePhotoIdx(idx)}
-                            className={`relative h-14 w-14 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${
-                              activePhotoIdx === idx ? 'border-orange-600 ring-2 ring-orange-400' : 'border-slate-200 opacity-70 hover:opacity-100'
-                            }`}
-                          >
-                            <img src={img} alt="" className="h-full w-full object-cover" />
-                            <span className="absolute bottom-0 right-0 px-1 rounded-tl bg-black/60 text-white text-[8px] font-bold">
-                              #{idx + 1}
-                            </span>
-                          </button>
-                        ))}
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 col-span-2 sm:col-span-1">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Commission / Brokerage</span>
+                      <span className="text-xs font-bold text-slate-800 block mt-1">
+                        {viewingProperty.commission || (viewingProperty.listingType === 'rent' ? '15 Days Rent' : '1% Deal')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Complete Specifications Grid */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-3">
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <i className="ri-list-check-3 text-orange-600 text-base" /> Full Property Specifications
+                  </h4>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Size & Super Area</span>
+                      <span className="font-extrabold text-slate-800 block mt-0.5">{viewingProperty.sizeSqft || '50 Gaj (450 sq.ft)'}</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Floor & Position</span>
+                      <span className="font-extrabold text-slate-800 block mt-0.5">{viewingProperty.floor || '1st Floor (Front Side)'}</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Lift Facility</span>
+                      <span className={`font-extrabold block mt-0.5 ${viewingProperty.lift === 'YES' ? 'text-emerald-700' : 'text-slate-700'}`}>
+                        {viewingProperty.lift === 'YES' ? '🛗 Lift Installed' : 'No Lift'}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Parking Space</span>
+                      <span className="font-extrabold text-slate-800 block mt-0.5">{viewingProperty.parking || 'Car + Bike Parking'}</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Furnishing</span>
+                      <span className="font-extrabold text-slate-800 block mt-0.5">{viewingProperty.furnishingStatus || 'Semi-Furnished'}</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Possession Status</span>
+                      <span className="font-extrabold text-slate-800 block mt-0.5">{viewingProperty.possessionStatus || 'Ready to Move'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Address & Landmark */}
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <i className="ri-map-pin-range-line text-blue-600 text-base" /> Complete Address & Landmark
+                    </h4>
+                    {viewingProperty.completeAddress && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(viewingProperty.completeAddress);
+                          setStatus('✓ Address copied to clipboard!');
+                        }}
+                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                      >
+                        <i className="ri-file-copy-line" /> Copy Address
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs font-semibold text-slate-700 leading-relaxed">
+                    {viewingProperty.completeAddress || `${viewingProperty.location || 'Local area'}, Delhi NCR`}
+                  </div>
+                </div>
+
+                {/* 5. Sourced Associate / Builder / Owner Contact */}
+                <div className="bg-gradient-to-br from-orange-50/80 via-amber-50/40 to-white p-4 rounded-2xl border border-orange-200/80 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-orange-700 font-black uppercase tracking-wider flex items-center gap-1.5">
+                      <i className="ri-user-shared-line text-base text-orange-600" /> Sourced Associate / Builder
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-orange-100 text-orange-800 text-[10px] font-black uppercase">
+                      {viewingProperty.sourcedBy || viewingProperty.source || 'Direct Source'}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-orange-100">
+                    <div>
+                      <h5 className="text-sm font-black text-slate-900">
+                        {viewingProperty.ownerName || 'Associate / Builder'}
+                      </h5>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5 font-bold">
+                        {viewingProperty.ownerContact ? `+91 ${viewingProperty.ownerContact}` : 'Direct Office Inventory'}
+                      </p>
+                    </div>
+
+                    {viewingProperty.ownerContact && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <a
+                          href={`https://wa.me/91${String(viewingProperty.ownerContact).replace(/[^\d]/g, '')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <i className="ri-whatsapp-fill text-sm" /> WhatsApp
+                        </a>
+                        <a
+                          href={`tel:${String(viewingProperty.ownerContact).replace(/[^\d]/g, '')}`}
+                          className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <i className="ri-phone-fill text-sm" /> Call
+                        </a>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="h-32 w-full rounded-2xl bg-gradient-to-br from-slate-50 to-orange-50/40 border border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 gap-1.5">
-                    <div className="h-9 w-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-lg">
-                      <i className="ri-image-2-line" />
+                </div>
+
+                {/* 6. Amenities & Features */}
+                {amenitiesList.length > 0 && (
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-2.5">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <i className="ri-sparkling-fill text-amber-500 text-base" /> Amenities & Colony Features
+                    </h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {amenitiesList.map((item, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-800 text-[11px] font-bold flex items-center gap-1.5 border border-slate-200/60"
+                        >
+                          <i className="ri-checkbox-circle-fill text-emerald-600 text-xs" /> {item}
+                        </span>
+                      ))}
                     </div>
-                    <span className="text-xs font-bold text-slate-500">No photos attached to this property</span>
+                  </div>
+                )}
+
+                {/* 7. Additional Notes / Descriptions */}
+                {(viewingProperty.notes || viewingProperty.description) && (
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-1.5">
+                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <i className="ri-sticky-note-line text-slate-600 text-base" /> Internal Notes & Highlights
+                    </h4>
+                    <p className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      {viewingProperty.notes || viewingProperty.description}
+                    </p>
                   </div>
                 )}
               </div>
 
-              {/* Property Details Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Demand Price</span>
-                  <span className="text-xs font-black text-emerald-700">{priceLabel(viewingProperty)}</span>
-                </div>
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Net Deal</span>
-                  <span className="text-xs font-black text-amber-700">
-                    {viewingProperty.netProfit > 0 ? formatINR(viewingProperty.netProfit) : 'Firm Demand'}
-                  </span>
-                </div>
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Size & Floor</span>
-                  <span className="font-bold text-slate-800 text-xs">
-                    {viewingProperty.sizeSqft || '50 Gaj'} • {viewingProperty.floor || 'Standard'}
-                  </span>
-                </div>
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Lift & Parking</span>
-                  <span className="font-bold text-slate-800 text-xs">
-                    {viewingProperty.lift === 'YES' ? '🛗 Lift Yes' : 'No Lift'} • {viewingProperty.parking || 'Standard'}
-                  </span>
-                </div>
-              </div>
-
-              {viewingProperty.completeAddress && (
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs">
-                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Address Landmark</span>
-                  <span className="font-bold text-slate-700 text-xs">{viewingProperty.completeAddress}</span>
-                </div>
-              )}
-
-              {/* Associate Contact */}
-              <div className="bg-orange-50/70 p-2.5 rounded-2xl border border-orange-200/70 flex items-center justify-between gap-3 text-xs">
-                <div>
-                  <span className="text-[10px] text-orange-600 font-bold block uppercase">Associate Contact</span>
-                  <span className="font-black text-slate-900 block">{viewingProperty.ownerName || 'Associate / Direct'}</span>
-                  {viewingProperty.ownerContact && (
-                    <span className="text-[10px] text-slate-600 font-mono block">{viewingProperty.ownerContact}</span>
-                  )}
-                </div>
-                {viewingProperty.ownerContact && (
-                  <div className="flex items-center gap-1.5">
-                    <a
-                      href={`https://wa.me/91${String(viewingProperty.ownerContact).replace(/[^\d]/g, '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs flex items-center gap-1 transition cursor-pointer"
-                    >
-                      <i className="ri-whatsapp-line" /> WhatsApp
-                    </a>
-                    <a
-                      href={`tel:${String(viewingProperty.ownerContact).replace(/[^\d]/g, '')}`}
-                      className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold shadow-xs flex items-center gap-1 transition cursor-pointer"
-                    >
-                      <i className="ri-phone-line" /> Call
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Actions */}
-              <div className="flex items-center gap-2 pt-1">
+              {/* Sticky Footer Action Bar */}
+              <div className="p-4 bg-white border-t border-slate-200 flex items-center gap-2.5 shadow-lg shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -2442,9 +2980,9 @@ export default function EmployeeDashboard() {
                     setActivePhotoIdx(0);
                     startEdit(target);
                   }}
-                  className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md hover:shadow-lg"
                 >
-                  <i className="ri-edit-line text-sm" />
+                  <i className="ri-edit-line text-base" />
                   <span>Edit Listing</span>
                 </button>
                 <button
@@ -2456,15 +2994,15 @@ export default function EmployeeDashboard() {
                     setPitchingProperty(target);
                     setPitchClientName('');
                   }}
-                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md hover:shadow-lg"
                 >
-                  <i className="ri-whatsapp-line text-sm" />
+                  <i className="ri-whatsapp-fill text-base" />
                   <span>WhatsApp Pitch</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => { setViewingProperty(null); setActivePhotoIdx(0); }}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                  className="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black transition cursor-pointer"
                 >
                   Close
                 </button>
@@ -2473,6 +3011,124 @@ export default function EmployeeDashboard() {
           </div>
         );
       })()}
+
+      {/* ─── MODAL: EXCEL UPLOAD DIALOG ─── */}
+      {showExcelModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 font-['Inter',sans-serif]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg shadow-2xs">
+                  <i className="ri-file-excel-2-line" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Upload Property Inventory (.xlsx / .csv)</h3>
+                  <p className="text-[11px] text-slate-400">Import bulk flat listings directly into database</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowExcelModal(false); setExcelUploadStatus(null); }}
+                className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer"
+              >
+                <i className="ri-close-line text-lg" />
+              </button>
+            </div>
+
+            {/* Template Download Prompt */}
+            <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl flex items-center justify-between gap-3 text-xs">
+              <div className="space-y-0.5">
+                <span className="font-bold text-emerald-950 block">Exact Excel Template Supported</span>
+                <span className="text-[10.5px] text-emerald-700 block">
+                  Columns: S.NO, SIZE, FLOOR, PRICE, LOCATION, LIFT, PARKING, ADDRESS, CONTACT, NET PRICE, BY, NOTES
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={downloadSampleTemplate}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[11px] font-bold shrink-0 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+              >
+                <i className="ri-download-2-line text-xs" />
+                <span>Sample CSV</span>
+              </button>
+            </div>
+
+            {/* Dropzone */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDraggingExcel(true); }}
+              onDragLeave={() => setIsDraggingExcel(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDraggingExcel(false);
+                const file = e.dataTransfer?.files?.[0];
+                if (file) handleExcelUpload(file);
+              }}
+              onClick={() => excelFileRef.current?.click()}
+              className={`p-6 border-2 border-dashed rounded-3xl text-center cursor-pointer transition-all ${
+                isDraggingExcel
+                  ? 'border-emerald-500 bg-emerald-50/50 scale-[1.01]'
+                  : 'border-slate-300 hover:border-emerald-400 bg-slate-50/60 hover:bg-emerald-50/20'
+              }`}
+            >
+              <input
+                ref={excelFileRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleExcelUpload(file);
+                }}
+                className="hidden"
+              />
+
+              <div className="h-12 w-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl mx-auto mb-2.5 shadow-2xs">
+                {uploadingExcel ? (
+                  <i className="ri-loader-4-line animate-spin" />
+                ) : (
+                  <i className="ri-upload-cloud-2-line" />
+                )}
+              </div>
+
+              <h4 className="text-xs font-black text-slate-800">
+                {uploadingExcel ? 'Parsing & Uploading Excel...' : 'Click to Browse or Drag & Drop Excel file'}
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-1 font-medium">
+                Supports Microsoft Excel (.xlsx, .xls) and Comma-Separated Values (.csv)
+              </p>
+            </div>
+
+            {/* Status Feedback Alert */}
+            {excelUploadStatus && (
+              <div
+                className={`p-3 rounded-2xl text-xs font-bold flex items-start gap-2 ${
+                  excelUploadStatus.type === 'success'
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-red-50 text-red-700 border border-red-200'
+                }`}
+              >
+                <i
+                  className={`text-base shrink-0 ${
+                    excelUploadStatus.type === 'success' ? 'ri-checkbox-circle-fill text-emerald-600' : 'ri-error-warning-fill text-red-500'
+                  }`}
+                />
+                <span className="leading-snug">{excelUploadStatus.msg}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => { setShowExcelModal(false); setExcelUploadStatus(null); }}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+              >
+                {excelUploadStatus?.type === 'success' ? 'Done & Close' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

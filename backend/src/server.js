@@ -33,7 +33,7 @@ const excelUploadRoutes = (await import("./routes/excelUploadRoutes.js")).defaul
 // backend/src/server.js -> backend/src -> backend -> project root (where dist/ lives)
 const root = dirname(dirname(__dirname));
 const distDirectory = join(root, "dist");
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 6000;
 
 const initialProperty = {
   type: "flat",
@@ -122,25 +122,32 @@ const seedBootstrapEmployee = async () => {
     .trim()
     .toLowerCase();
   const password = process.env.EMPLOYEE_PASSWORD || "Baba@123";
-  const existing = await User.findOne({ email });
+  const phone = process.env.EMPLOYEE_PHONE || "9319290979";
+  const existing = await User.findOne({ $or: [{ email }, { phone }, { phone: '9810022334' }] });
   if (existing) {
-    if (!existing.displayPassword || !existing.phone) {
-      existing.displayPassword = existing.displayPassword || password;
-      existing.phone = existing.phone || '9810022334';
-      await existing.save();
-    }
+    existing.phone = phone;
+    existing.email = email;
+    existing.role = "employee";
+    existing.displayPassword = password;
+    existing.passwordHash = await bcrypt.hash(password, 10);
+    existing.isActive = true;
+    existing.loginAttempts = 0;
+    existing.lockUntil = null;
+    await existing.save();
+    console.log(`Bootstrap employee account synced: ${email} (${phone})`);
     return;
   }
   const passwordHash = await bcrypt.hash(password, 10);
   await User.create({
     name: "Employee",
     email,
-    phone: "9810022334",
+    phone,
     passwordHash,
     displayPassword: password,
     role: "employee",
+    isActive: true,
   });
-  console.log(`Bootstrap employee account created: ${email}`);
+  console.log(`Bootstrap employee account created: ${email} (${phone})`);
 };
 
 const start = async () => {

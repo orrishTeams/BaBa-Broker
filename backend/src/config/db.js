@@ -9,7 +9,14 @@ if (!cached) {
 }
 
 export const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/baba_broker';
+  const uri = process.env.MONGODB_URI;
+
+  if (!uri) {
+    dbState.ready = false;
+    const errorMsg = 'MONGODB_URI environment variable is required. Local fallback is disabled.';
+    console.error(`[Database Error] ${errorMsg}`);
+    throw new Error(errorMsg);
+  }
 
   if (cached.conn && mongoose.connection.readyState === 1) {
     dbState.ready = true;

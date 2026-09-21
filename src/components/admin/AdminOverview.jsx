@@ -1287,13 +1287,18 @@ export default function AdminOverview({
                             <img
                               src={p.image}
                               alt={p.title}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                if (e.currentTarget.nextElementSibling) {
+                                  e.currentTarget.nextElementSibling.style.display = 'flex';
+                                }
+                              }}
                               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                             />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
-                              <i className="ri-building-line text-2xl"></i>
-                            </div>
-                          )}
+                          ) : null}
+                          <div className={`flex h-full w-full items-center justify-center bg-slate-100 text-slate-400 ${p.image ? 'hidden' : 'flex'}`}>
+                            <i className="ri-building-line text-2xl"></i>
+                          </div>
 
                           <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-1 z-10">
                             <span className="rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-[#ea580c] text-white shadow-xs">

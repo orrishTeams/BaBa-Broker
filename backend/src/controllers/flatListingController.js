@@ -153,3 +153,13 @@ export const deleteFlatListing = async (req, res) => {
   await FlatListing.findByIdAndDelete(id);
   res.status(200).json({ message: 'Listing deleted successfully.' });
 };
+
+export const cleanAllFlatListings = async (req, res) => {
+  const filter = req.user.role === 'salesman' ? { submittedBy: req.user.id } : {};
+  const result = await FlatListing.deleteMany(filter);
+  res.status(200).json({
+    message: 'Property inventory cleaned successfully.',
+    deletedCount: result.deletedCount,
+  });
+};
+

@@ -12,6 +12,5 @@ const tokenSchema = new mongoose.Schema(
   { timestamps: true, versionKey: false }
 );
 
-tokenSchema.index({ jti: 1 }, { unique: true });
 
 export default mongoose.models.Token || mongoose.model('Token', tokenSchema);

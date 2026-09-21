@@ -24,7 +24,8 @@ const QUICK_AMENITIES = [
 const emptyFlatListing = () => ({
   ownerName: '',
   ownerContact: '',
-  propertyCategory: 'HK',
+  propertyCategory: 'Flat',
+  commercialSubType: 'Office',
   furnishingStatus: 'Semi-Furnished',
   floor: 'Ground Floor (Front Side)',
   completeAddress: '',
@@ -185,7 +186,23 @@ export default function SalesmanDashboard() {
 
   const filteredListings = useMemo(() => {
     let result = listings.filter((item) => {
-      if (filterCategory !== 'all' && item.propertyCategory !== filterCategory) return false;
+      if (filterCategory !== 'all') {
+        const cat = item.propertyCategory || '';
+        const cfg = String(item.configuration || '').toLowerCase();
+        if (filterCategory === 'Commercial') {
+          if (cat !== 'Commercial' && cat !== 'Office' && cat !== 'Shop' && !cfg.includes('office') && !cfg.includes('shop')) return false;
+        } else if (filterCategory === 'Office') {
+          if (cat !== 'Office' && !cfg.includes('office')) return false;
+        } else if (filterCategory === 'Shop') {
+          if (cat !== 'Shop' && !cfg.includes('shop')) return false;
+        } else if (filterCategory === 'Flat') {
+          if (cat === 'Commercial' || cat === 'Office' || cat === 'Shop' || cat === 'Plot' || cat === 'Land' || cfg.includes('shop') || cfg.includes('office') || cfg.includes('plot')) return false;
+        } else if (filterCategory === 'Plot') {
+          if (cat !== 'Plot' && cat !== 'Land' && !cfg.includes('plot') && !cfg.includes('land')) return false;
+        } else if (cat !== filterCategory) {
+          return false;
+        }
+      }
       if (filterType !== 'all' && item.listingType !== filterType) return false;
 
       // Price Filter
@@ -880,18 +897,25 @@ Contact *${salesmanName}* | Baba Broker Real Estate
                 {/* 2. Filter & View Bar with Highlighted Budget Selector on Right Corner */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {['all', 'HK', 'RK', 'Shop', 'Plot', 'Office'].map((cat) => (
+                    {[
+                      { id: 'all', label: 'All Types' },
+                      { id: 'Flat', label: '🏠 Flat' },
+                      { id: 'Commercial', label: '🏢 Commercial' },
+                      { id: 'Office', label: '💼 Office' },
+                      { id: 'Shop', label: '🏪 Shop' },
+                      { id: 'Plot', label: '📐 Plot' },
+                    ].map((cat) => (
                       <button
-                        key={cat}
+                        key={cat.id}
                         type="button"
-                        onClick={() => { setFilterCategory(cat); setCurrentPage(1); }}
+                        onClick={() => { setFilterCategory(cat.id); setCurrentPage(1); }}
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                          filterCategory === cat
+                          filterCategory === cat.id
                             ? 'bg-[#ea580c] text-white shadow-2xs'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        {cat === 'all' ? 'All Types' : cat}
+                        {cat.label}
                       </button>
                     ))}
 
@@ -1316,38 +1340,42 @@ Contact *${salesmanName}* | Baba Broker Real Estate
                   )}
                 </div>
 
-                {/* ─── SECTION 1: CLASSIFICATION, DEAL TYPE & PLOT SIZE ─── */}
-                <div className="rounded-2xl border border-orange-500/25 bg-gradient-to-b from-orange-50/20 via-white to-white p-3.5 sm:p-4 space-y-3 shadow-xs relative overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600" />
+                {/* ─── SECTION 1: CLASSIFICATION, DEAL TYPE & PROPERTY CATEGORY ─── */}
+                <div className="rounded-2xl border border-orange-500/25 bg-gradient-to-b from-orange-50/30 via-white to-white p-3.5 sm:p-4.5 space-y-3.5 shadow-xs relative overflow-hidden">
+                  <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-orange-500 via-amber-500 to-cyan-500" />
 
+                  {/* Step Header */}
                   <div className="flex items-center justify-between pb-2 border-b border-orange-100/70">
                     <div className="flex items-center gap-2">
-                      <span className="h-5 w-5 rounded-lg bg-orange-600 text-white flex items-center justify-center font-black text-[10px] shadow-xs">
+                      <span className="h-5.5 w-5.5 rounded-lg bg-orange-600 text-white flex items-center justify-center font-black text-[11px] shadow-xs">
                         1
                       </span>
-                      <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                        Classification &amp; Deal Configuration
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-orange-100 text-orange-800 border border-orange-200">
-                          Priority
-                        </span>
-                      </h3>
+                      <div>
+                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                          Classification &amp; Deal Configuration
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-orange-100 text-orange-800 border border-orange-200">
+                            Required
+                          </span>
+                        </h3>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-black text-orange-700 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200/70">
+                    <span className="text-[10px] font-black text-orange-700 bg-orange-50 px-2.5 py-0.5 rounded-md border border-orange-200/70">
                       Step 1 of 3
                     </span>
                   </div>
 
-                  {/* Deal Type & Layout Row */}
+                  {/* Primary Row: Deal Intent (Sale vs Rent/Lease) + 3 Primary Categories (Flat, Commercial, Plot) */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 text-xs">
-                    {/* Deal Type Switcher (5 Cols) */}
-                    <div className="lg:col-span-5 p-2.5 rounded-xl bg-slate-900 text-white border border-slate-800 space-y-1.5 shadow-sm">
+                    
+                    {/* Deal Type Switcher (4 Cols) */}
+                    <div className="lg:col-span-4 p-2.5 rounded-xl bg-slate-900 text-white border border-slate-800 space-y-1.5 shadow-sm">
                       <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                        <label className="text-[10px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1">
                           <i className="ri-fire-fill text-orange-400 text-xs" />
-                          Deal Type
+                          Deal Intent
                         </label>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                          Active: <strong className="text-white">{form.listingType === 'buy' ? 'Sale' : 'Rent'}</strong>
+                          Active: <strong className={form.listingType === 'buy' ? 'text-amber-400' : 'text-cyan-400'}>{form.listingType === 'buy' ? 'For Sale' : 'For Rent'}</strong>
                         </span>
                       </div>
 
@@ -1355,7 +1383,7 @@ Contact *${salesmanName}* | Baba Broker Real Estate
                         <button
                           type="button"
                           onClick={() => setForm({ ...form, listingType: 'buy' })}
-                          className={`py-2 px-2.5 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          className={`py-2 px-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                             form.listingType === 'buy'
                               ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 border-white shadow-md font-black scale-[1.02]'
                               : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
@@ -1368,9 +1396,9 @@ Contact *${salesmanName}* | Baba Broker Real Estate
                         <button
                           type="button"
                           onClick={() => setForm({ ...form, listingType: 'rent' })}
-                          className={`py-2 px-2.5 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          className={`py-2 px-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                             form.listingType === 'rent'
-                              ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white border-white shadow-md font-black scale-[1.02]'
+                              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-white shadow-md font-black scale-[1.02]'
                               : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
                           }`}
                         >
@@ -1380,62 +1408,385 @@ Contact *${salesmanName}* | Baba Broker Real Estate
                       </div>
                     </div>
 
-                    {/* Configuration Layout (4 Cols) */}
-                    <div className="lg:col-span-4 space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700 block">
-                        BHK Configuration <span className="text-orange-600 font-bold">({form.configuration})</span>
-                      </label>
-                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
-                        {['1 RK', '1 BHK', '2 BHK', '3 BHK', '4 BHK', 'Jad se'].map((bhk) => (
-                          <button
-                            key={bhk}
-                            type="button"
-                            onClick={() => setForm({ ...form, configuration: bhk })}
-                            className={`py-2 rounded-lg text-xs font-bold transition cursor-pointer border truncate text-center ${
-                              form.configuration === bhk
-                                ? 'bg-orange-600 text-white border-orange-600 shadow-xs font-black'
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {bhk}
-                          </button>
-                        ))}
+                    {/* 3 Main Property Options: Flat, Commercial, Plot (8 Cols) */}
+                    <div className="lg:col-span-8 p-2.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                          <i className="ri-layout-grid-fill text-orange-600 text-xs" />
+                          Select Property Category <span className="text-orange-600">*</span>
+                        </label>
+                        <span className="text-[9px] font-bold text-slate-400">
+                          3 Primary Types
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        {/* 1. FLAT */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForm({
+                              ...form,
+                              propertyCategory: 'Flat',
+                              configuration: form.configuration?.includes('BHK') || form.configuration === '1 RK' || form.configuration === 'Jad se' ? form.configuration : '2 BHK',
+                              sizeSqft: form.sizeSqft?.includes('Gaj') ? form.sizeSqft : '50 Gaj (450 sq.ft)',
+                            });
+                          }}
+                          className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
+                            (form.propertyCategory === 'Flat' || form.propertyCategory === 'HK' || form.propertyCategory === 'RK' || (!form.propertyCategory && form.propertyCategory !== 'Commercial' && form.propertyCategory !== 'Plot' && form.propertyCategory !== 'Office' && form.propertyCategory !== 'Shop'))
+                              ? 'bg-gradient-to-br from-orange-500/10 to-amber-500/15 border-orange-500 text-orange-950 font-black shadow-xs ring-2 ring-orange-500/30'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base">🏠</span>
+                            <span className="text-xs font-black">Flat</span>
+                          </div>
+                          <span className="text-[9px] text-slate-500 mt-0.5 leading-tight truncate">
+                            Builder Floor / Apt
+                          </span>
+                        </button>
+
+                        {/* 2. COMMERCIAL */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sub = form.commercialSubType || 'Office';
+                            setForm({
+                              ...form,
+                              propertyCategory: 'Commercial',
+                              commercialSubType: sub,
+                              configuration: sub === 'Office' ? 'Furnished Office' : 'Main Road Shop',
+                              sizeSqft: form.sizeSqft?.includes('sq.ft') ? form.sizeSqft : '500 sq.ft',
+                            });
+                          }}
+                          className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
+                            (form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop')
+                              ? 'bg-gradient-to-br from-blue-500/10 to-indigo-500/15 border-blue-600 text-blue-950 font-black shadow-xs ring-2 ring-blue-500/30'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base">🏢</span>
+                            <span className="text-xs font-black text-blue-900">Commercial</span>
+                          </div>
+                          <span className="text-[9px] text-blue-700 font-semibold mt-0.5 leading-tight truncate">
+                            Office &amp; Shop Space
+                          </span>
+                        </button>
+
+                        {/* 3. PLOT / LAND */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForm({
+                              ...form,
+                              propertyCategory: 'Plot',
+                              configuration: 'Residential Plot',
+                              sizeSqft: '100 Gaj (900 sq.ft)',
+                            });
+                          }}
+                          className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
+                            form.propertyCategory === 'Plot' || form.propertyCategory === 'Land'
+                              ? 'bg-gradient-to-br from-emerald-500/10 to-teal-500/15 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-500/30'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base">📐</span>
+                            <span className="text-xs font-black text-emerald-900">Plot / Land</span>
+                          </div>
+                          <span className="text-[9px] text-emerald-700 font-semibold mt-0.5 leading-tight truncate">
+                            Freehold Land
+                          </span>
+                        </button>
                       </div>
                     </div>
 
-                    {/* Plot Size / Area (3 Cols) */}
-                    <div className="lg:col-span-3 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-slate-700">Plot Size / Area</label>
-                        <span className="text-[9px] text-slate-400 font-medium">Gaj &amp; Sq.ft</span>
-                      </div>
-                      <input
-                        type="text"
-                        value={form.sizeSqft}
-                        onChange={(e) => setForm({ ...form, sizeSqft: e.target.value })}
-                        placeholder="e.g. 50 Gaj (450 sq.ft)"
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 outline-none text-xs font-medium"
-                      />
-                      <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                        {[
-                          { label: '30G', val: '30 Gaj (270 sq.ft)' },
-                          { label: '40G', val: '40 Gaj (360 sq.ft)' },
-                          { label: '50G', val: '50 Gaj (450 sq.ft)' },
-                          { label: '60G', val: '60 Gaj (540 sq.ft)' },
-                          { label: '100G', val: '100 Gaj (900 sq.ft)' },
-                        ].map((preset) => (
+                  </div>
+
+                  {/* ─── DYNAMIC SUB-CONFIGURATION PANELS ─── */}
+
+                  {/* A) WHEN COMMERCIAL IS SELECTED: 2 Options Appear (Office & Shop) */}
+                  {(form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop') && (
+                    <div className="p-3 sm:p-3.5 rounded-xl bg-gradient-to-r from-blue-50/50 via-indigo-50/30 to-slate-50 border border-blue-200/80 space-y-3 animate-in fade-in zoom-in-95 duration-150 shadow-2xs">
+                      
+                      {/* Commercial Sub-type Toggle: Office vs Shop */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-black text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <i className="ri-store-2-fill text-blue-600 text-xs" />
+                            Commercial Unit Type (Select Office or Shop)
+                          </label>
+                          <span className="text-[9px] font-bold text-blue-800 bg-blue-100/90 px-2 py-0.2 rounded border border-blue-200">
+                            Selected: <strong>{form.commercialSubType === 'Shop' ? 'Shop' : 'Office'}</strong>
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {/* 1. OFFICE */}
                           <button
-                            key={preset.label}
                             type="button"
-                            onClick={() => setForm({ ...form, sizeSqft: preset.val })}
-                            className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-orange-100 hover:text-orange-800 text-[9px] font-bold text-slate-600 border border-slate-200 transition cursor-pointer"
+                            onClick={() => {
+                              setForm({
+                                ...form,
+                                propertyCategory: 'Commercial',
+                                commercialSubType: 'Office',
+                                configuration: 'Furnished Office',
+                                sizeSqft: form.sizeSqft?.includes('sq.ft') ? form.sizeSqft : '500 sq.ft',
+                              });
+                            }}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                              (form.commercialSubType === 'Office' || (!form.commercialSubType && form.propertyCategory !== 'Shop'))
+                                ? 'bg-white border-blue-600 text-blue-950 shadow-sm ring-2 ring-blue-500/40 font-black'
+                                : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                            }`}
                           >
-                            {preset.label}
+                            <div className="flex items-center gap-2">
+                              <span className="h-8 w-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-lg shrink-0">
+                                💼
+                              </span>
+                              <div>
+                                <span className="block font-black text-xs text-blue-950">Commercial Office</span>
+                                <span className="text-[9px] text-slate-500 font-medium">IT, Corporate Suites &amp; Cabins</span>
+                              </div>
+                            </div>
+                            {(form.commercialSubType === 'Office' || (!form.commercialSubType && form.propertyCategory !== 'Shop')) && (
+                              <i className="ri-checkbox-circle-fill text-blue-600 text-base" />
+                            )}
                           </button>
-                        ))}
+
+                          {/* 2. SHOP */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm({
+                                ...form,
+                                propertyCategory: 'Commercial',
+                                commercialSubType: 'Shop',
+                                configuration: 'Main Road Shop',
+                                sizeSqft: form.sizeSqft?.includes('sq.ft') ? form.sizeSqft : '200 sq.ft',
+                              });
+                            }}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                              form.commercialSubType === 'Shop'
+                                ? 'bg-white border-indigo-600 text-indigo-950 shadow-sm ring-2 ring-indigo-500/40 font-black'
+                                : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="h-8 w-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg shrink-0">
+                                🏪
+                              </span>
+                              <div>
+                                <span className="block font-black text-xs text-indigo-950">Retail Shop / Showroom</span>
+                                <span className="text-[9px] text-slate-500 font-medium">Market Fronts, Booths &amp; Retail</span>
+                              </div>
+                            </div>
+                            {form.commercialSubType === 'Shop' && (
+                              <i className="ri-checkbox-circle-fill text-indigo-600 text-base" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Commercial Specs: Layout Chips + Area Presets */}
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 text-xs pt-1 border-t border-blue-100">
+                        {/* Sub-layout / Spec chips (7 cols) */}
+                        <div className="md:col-span-7 space-y-1">
+                          <label className="text-[10px] font-bold text-slate-700 block">
+                            {form.commercialSubType === 'Shop' ? 'Shop Spec / Location' : 'Office Layout / Furnishing'}
+                            <span className="text-blue-600 font-bold ml-1">({form.configuration})</span>
+                          </label>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                            {(form.commercialSubType === 'Shop'
+                              ? ['Main Road Shop', 'Corner Shop', 'Ground Retail', 'Basement Godown', 'Showroom', 'Market Booth']
+                              : ['Furnished Office', 'Bare Shell', 'Semi-Furnished', 'Co-Working Hub', 'Cabin Suite', 'Full Floor']
+                            ).map((spec) => (
+                              <button
+                                key={spec}
+                                type="button"
+                                onClick={() => setForm({ ...form, configuration: spec })}
+                                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer border truncate text-center ${
+                                  form.configuration === spec
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-black'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-900'
+                                }`}
+                              >
+                                {spec}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Commercial Area / Carpet Size (5 cols) */}
+                        <div className="md:col-span-5 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold text-slate-700">Carpet / Super Area</label>
+                            <span className="text-[9px] text-slate-400 font-medium">Sq.ft / Gaj</span>
+                          </div>
+                          <input
+                            type="text"
+                            value={form.sizeSqft}
+                            onChange={(e) => setForm({ ...form, sizeSqft: e.target.value })}
+                            placeholder={form.commercialSubType === 'Shop' ? 'e.g. 200 sq.ft (22 Gaj)' : 'e.g. 500 sq.ft (55 Gaj)'}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-400 outline-none text-xs font-bold text-slate-900 shadow-2xs"
+                          />
+                          <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                            {(form.commercialSubType === 'Shop'
+                              ? [
+                                  { label: '100 sq.ft', val: '100 sq.ft (11 Gaj)' },
+                                  { label: '200 sq.ft', val: '200 sq.ft (22 Gaj)' },
+                                  { label: '350 sq.ft', val: '350 sq.ft (39 Gaj)' },
+                                  { label: '500 sq.ft', val: '500 sq.ft (55 Gaj)' },
+                                  { label: '1000 sq.ft', val: '1000 sq.ft (111 Gaj)' },
+                                ]
+                              : [
+                                  { label: '150 sq.ft', val: '150 sq.ft (16 Gaj)' },
+                                  { label: '300 sq.ft', val: '300 sq.ft (33 Gaj)' },
+                                  { label: '500 sq.ft', val: '500 sq.ft (55 Gaj)' },
+                                  { label: '1000 sq.ft', val: '1000 sq.ft (111 Gaj)' },
+                                  { label: '2500 sq.ft', val: '2500 sq.ft (277 Gaj)' },
+                                ]
+                            ).map((preset) => (
+                              <button
+                                key={preset.label}
+                                type="button"
+                                onClick={() => setForm({ ...form, sizeSqft: preset.val })}
+                                className="px-1.5 py-0.5 rounded bg-white hover:bg-blue-100 hover:text-blue-900 text-[9px] font-bold text-slate-600 border border-slate-200 transition cursor-pointer"
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+
+                  {/* B) WHEN FLAT (RESIDENTIAL) IS SELECTED */}
+                  {(form.propertyCategory === 'Flat' || form.propertyCategory === 'HK' || form.propertyCategory === 'RK' || (!form.propertyCategory && form.propertyCategory !== 'Commercial' && form.propertyCategory !== 'Plot')) && (
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 text-xs p-3 rounded-xl bg-orange-50/30 border border-orange-200/70">
+                      {/* Configuration Layout (7 Cols) */}
+                      <div className="md:col-span-7 space-y-1">
+                        <label className="text-[10px] font-bold text-slate-700 block">
+                          BHK Configuration <span className="text-orange-600 font-bold">({form.configuration})</span>
+                        </label>
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+                          {['1 RK', '1 BHK', '2 BHK', '3 BHK', '4 BHK', 'Jad se'].map((bhk) => (
+                            <button
+                              key={bhk}
+                              type="button"
+                              onClick={() => setForm({ ...form, configuration: bhk })}
+                              className={`py-2 rounded-lg text-xs font-bold transition cursor-pointer border truncate text-center ${
+                                form.configuration === bhk
+                                  ? 'bg-orange-600 text-white border-orange-600 shadow-xs font-black'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-orange-50 hover:text-orange-950'
+                              }`}
+                            >
+                              {bhk}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Plot Size / Area (5 Cols) */}
+                      <div className="md:col-span-5 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-slate-700">Plot Size / Carpet Area</label>
+                          <span className="text-[9px] text-slate-400 font-medium">Gaj &amp; Sq.ft</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={form.sizeSqft}
+                          onChange={(e) => setForm({ ...form, sizeSqft: e.target.value })}
+                          placeholder="e.g. 50 Gaj (450 sq.ft)"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-orange-500 outline-none text-xs font-bold text-slate-900 shadow-2xs"
+                        />
+                        <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                          {[
+                            { label: '30G', val: '30 Gaj (270 sq.ft)' },
+                            { label: '40G', val: '40 Gaj (360 sq.ft)' },
+                            { label: '50G', val: '50 Gaj (450 sq.ft)' },
+                            { label: '60G', val: '60 Gaj (540 sq.ft)' },
+                            { label: '100G', val: '100 Gaj (900 sq.ft)' },
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => setForm({ ...form, sizeSqft: preset.val })}
+                              className="px-1.5 py-0.5 rounded bg-white hover:bg-orange-100 hover:text-orange-800 text-[9px] font-bold text-slate-600 border border-slate-200 transition cursor-pointer"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* C) WHEN PLOT / LAND IS SELECTED */}
+                  {(form.propertyCategory === 'Plot' || form.propertyCategory === 'Land') && (
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 text-xs p-3 rounded-xl bg-emerald-50/30 border border-emerald-200/70">
+                      {/* Land Type (7 Cols) */}
+                      <div className="md:col-span-7 space-y-1">
+                        <label className="text-[10px] font-bold text-slate-700 block">
+                          Land / Plot Category <span className="text-emerald-700 font-bold">({form.configuration})</span>
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                          {['Residential Plot', 'Commercial Plot', 'Industrial Land', 'Corner Plot', 'Agricultural', 'Farm Land'].map((pType) => (
+                            <button
+                              key={pType}
+                              type="button"
+                              onClick={() => setForm({ ...form, configuration: pType })}
+                              className={`py-2 rounded-lg text-xs font-bold transition cursor-pointer border truncate text-center ${
+                                form.configuration === pType
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs font-black'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50 hover:text-emerald-950'
+                              }`}
+                            >
+                              {pType}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Plot Size (5 Cols) */}
+                      <div className="md:col-span-5 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-slate-700">Total Plot Area</label>
+                          <span className="text-[9px] text-slate-400 font-medium">Gaj / Sq.Yards</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={form.sizeSqft}
+                          onChange={(e) => setForm({ ...form, sizeSqft: e.target.value })}
+                          placeholder="e.g. 100 Gaj (900 sq.ft)"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-emerald-500 outline-none text-xs font-bold text-slate-900 shadow-2xs"
+                        />
+                        <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                          {[
+                            { label: '50G', val: '50 Gaj (450 sq.ft)' },
+                            { label: '100G', val: '100 Gaj (900 sq.ft)' },
+                            { label: '200G', val: '200 Gaj (1800 sq.ft)' },
+                            { label: '500G', val: '500 Gaj (4500 sq.ft)' },
+                            { label: '1000G', val: '1000 Gaj (9000 sq.ft)' },
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => setForm({ ...form, sizeSqft: preset.val })}
+                              className="px-1.5 py-0.5 rounded bg-white hover:bg-emerald-100 hover:text-emerald-800 text-[9px] font-bold text-slate-600 border border-slate-200 transition cursor-pointer"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
 
                 {/* ─── SECTION 2: FLOOR & BUILDING FACILITIES (LIFT, PARKING, LOCATION) ─── */}
@@ -1473,16 +1824,31 @@ Contact *${salesmanName}* | Baba Broker Real Estate
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-400 outline-none text-xs font-bold text-slate-800 appearance-none cursor-pointer pr-8 shadow-2xs"
                         >
                           <option value="">-- Select Floor Position --</option>
-                          <option value="Ground Floor (Front Side)">Ground Floor (Front Side) [G-FS]</option>
-                          <option value="Ground Floor (Back Side)">Ground Floor (Back Side) [G-BS]</option>
-                          <option value="Upper Ground (Front Side)">Upper Ground (Front Side) [UG-FS]</option>
-                          <option value="1st Floor (Front Side)">1st Floor (Front Side) [1ST-FS]</option>
-                          <option value="2nd Floor (Back Side)">2nd Floor (Back Side) [2ND-BS]</option>
-                          <option value="3rd Floor (Front Side)">3rd Floor (Front Side) [3RD-FS]</option>
-                          <option value="Top Floor with Roof Rights">Top Floor with Roof Rights [T-BS]</option>
-                          <option value="Basement Floor">Basement / Lower Ground [BSMT]</option>
-                          <option value="Duplex">Duplex Floor</option>
-                          <option value="Independent House / Villa">Independent House / Villa</option>
+                          {(form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop') ? (
+                            <>
+                              <option value="Ground Floor (Main Road Front)">Ground Floor (Main Road Front)</option>
+                              <option value="Ground Floor (Inside Market / Plaza)">Ground Floor (Inside Market / Plaza)</option>
+                              <option value="Upper Ground (Commercial)">Upper Ground (Commercial)</option>
+                              <option value="1st Floor (Commercial Front)">1st Floor (Commercial Front)</option>
+                              <option value="2nd Floor (Office Suite)">2nd Floor (Office Suite)</option>
+                              <option value="3rd Floor / Corporate Tower">3rd Floor / Corporate Tower</option>
+                              <option value="Basement (Commercial / Storage)">Basement (Commercial / Storage)</option>
+                              <option value="Full Standalone Commercial Building">Full Standalone Commercial Building</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value="Ground Floor (Front Side)">Ground Floor (Front Side) [G-FS]</option>
+                              <option value="Ground Floor (Back Side)">Ground Floor (Back Side) [G-BS]</option>
+                              <option value="Upper Ground (Front Side)">Upper Ground (Front Side) [UG-FS]</option>
+                              <option value="1st Floor (Front Side)">1st Floor (Front Side) [1ST-FS]</option>
+                              <option value="2nd Floor (Back Side)">2nd Floor (Back Side) [2ND-BS]</option>
+                              <option value="3rd Floor (Front Side)">3rd Floor (Front Side) [3RD-FS]</option>
+                              <option value="Top Floor with Roof Rights">Top Floor with Roof Rights [T-BS]</option>
+                              <option value="Basement Floor">Basement / Lower Ground [BSMT]</option>
+                              <option value="Duplex">Duplex Floor</option>
+                              <option value="Independent House / Villa">Independent House / Villa</option>
+                            </>
+                          )}
                         </select>
                         <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">
                           <i className="ri-arrow-down-s-line text-sm" />

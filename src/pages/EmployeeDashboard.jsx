@@ -26,7 +26,8 @@ const priceLabel = (listing) =>
 const emptyFlatListing = () => ({
   ownerName: '',
   ownerContact: '',
-  propertyCategory: 'HK',
+  propertyCategory: 'Flat',
+  commercialSubType: 'Office',
   furnishingStatus: 'Semi-Furnished',
   floor: '1st Floor (Front Side)',
   lift: 'YES',
@@ -224,7 +225,23 @@ export default function EmployeeDashboard() {
 
   const filteredListings = useMemo(() => {
     let result = listings.filter((item) => {
-      if (filterCategory !== 'all' && item.propertyCategory !== filterCategory) return false;
+      if (filterCategory !== 'all') {
+        const cat = item.propertyCategory || '';
+        const cfg = String(item.configuration || '').toLowerCase();
+        if (filterCategory === 'Commercial') {
+          if (cat !== 'Commercial' && cat !== 'Office' && cat !== 'Shop' && !cfg.includes('office') && !cfg.includes('shop')) return false;
+        } else if (filterCategory === 'Office') {
+          if (cat !== 'Office' && !cfg.includes('office')) return false;
+        } else if (filterCategory === 'Shop') {
+          if (cat !== 'Shop' && !cfg.includes('shop')) return false;
+        } else if (filterCategory === 'Flat') {
+          if (cat === 'Commercial' || cat === 'Office' || cat === 'Shop' || cat === 'Plot' || cat === 'Land' || cfg.includes('shop') || cfg.includes('office') || cfg.includes('plot')) return false;
+        } else if (filterCategory === 'Plot') {
+          if (cat !== 'Plot' && cat !== 'Land' && !cfg.includes('plot') && !cfg.includes('land')) return false;
+        } else if (cat !== filterCategory) {
+          return false;
+        }
+      }
       if (filterType !== 'all' && item.listingType !== filterType) return false;
 
       // Price Filter
@@ -1065,86 +1082,413 @@ export default function EmployeeDashboard() {
                     <span className="text-[10px] font-bold text-slate-400">Step 1 of 4</span>
                   </div>
 
-                  {/* 1. Category Fast Chips */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-700 block">Select Category Type</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                      {[
-                        { id: 'HK', label: 'Builder Floor / Flat', icon: '🏠', desc: 'Standard residential units' },
-                        { id: 'RK', label: 'Studio / 1 RK Flat', icon: '🏢', desc: 'Compact bachelor units' },
-                        { id: 'Plot', label: 'Freehold Land / Plot', icon: '📐', desc: 'Plots & raw land' },
-                        { id: 'Shop', label: 'Commercial Shop', icon: '🏪', desc: 'Retail & business spaces' },
-                      ].map((cat) => (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => setForm({ ...form, propertyCategory: cat.id })}
-                          className={`p-2.5 rounded-2xl text-left border transition cursor-pointer flex flex-col justify-between ${
-                            form.propertyCategory === cat.id
-                              ? 'bg-orange-50 border-orange-500 text-orange-950 font-black shadow-xs ring-1 ring-orange-400'
-                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-medium'
-                          }`}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-base">{cat.icon}</span>
-                            <span className="text-xs font-bold">{cat.label}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-400 mt-1">{cat.desc}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 2. Configuration & Listing Type */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-700 block">Unit Configuration</label>
-                      <div className="grid grid-cols-3 sm:grid-cols-7 gap-1.5">
-                        {['1 BHK', '2 BHK', '3 BHK', '4 BHK', '1 RK', 'Jad se', 'Shop'].map((cfg) => (
-                          <button
-                            key={cfg}
-                            type="button"
-                            onClick={() => setForm({ ...form, configuration: cfg })}
-                            className={`py-2 rounded-xl font-bold text-xs border transition cursor-pointer text-center ${
-                              form.configuration === cfg
-                                ? 'bg-orange-600 text-white border-orange-600 shadow-2xs font-black'
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {cfg}
-                          </button>
-                        ))}
+                  {/* Deal Intent & 3 Main Category Chips */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 text-xs">
+                    {/* Deal Intent (4 cols) */}
+                    <div className="lg:col-span-4 p-2.5 rounded-xl bg-slate-900 text-white border border-slate-800 space-y-1.5 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                          <i className="ri-fire-fill text-orange-400 text-xs" />
+                          Deal Intent
+                        </label>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                          Active: <strong className={form.listingType === 'buy' ? 'text-amber-400' : 'text-cyan-400'}>{form.listingType === 'buy' ? 'For Sale' : 'For Rent'}</strong>
+                        </span>
                       </div>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-700 block">Deal Intent</label>
-                      <div className="grid grid-cols-2 gap-1.5">
+                      <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => setForm({ ...form, listingType: 'buy' })}
-                          className={`py-2 rounded-xl text-xs font-bold transition cursor-pointer border text-center ${
+                          className={`py-2 px-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                             form.listingType === 'buy'
-                              ? 'bg-orange-600 text-white border-orange-600 shadow-2xs font-black'
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                              ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 border-white shadow-md font-black scale-[1.02]'
+                              : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
                           }`}
                         >
-                          🏷️ For Sale
+                          <i className="ri-price-tag-3-fill text-xs" />
+                          <span>For Sale / Buy</span>
                         </button>
+
                         <button
                           type="button"
                           onClick={() => setForm({ ...form, listingType: 'rent' })}
-                          className={`py-2 rounded-xl text-xs font-bold transition cursor-pointer border text-center ${
+                          className={`py-2 px-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                             form.listingType === 'rent'
-                              ? 'bg-orange-600 text-white border-orange-600 shadow-2xs font-black'
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-white shadow-md font-black scale-[1.02]'
+                              : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
                           }`}
                         >
-                          🔑 For Rent
+                          <i className="ri-key-2-fill text-xs" />
+                          <span>For Rent / Lease</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 3 Main Categories: Flat, Commercial, Plot (8 cols) */}
+                    <div className="lg:col-span-8 p-2.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                          <i className="ri-layout-grid-fill text-orange-600 text-xs" />
+                          Select Property Category <span className="text-orange-600">*</span>
+                        </label>
+                        <span className="text-[9px] font-bold text-slate-400">
+                          3 Primary Types
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        {/* 1. FLAT */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForm({
+                              ...form,
+                              propertyCategory: 'Flat',
+                              configuration: form.configuration?.includes('BHK') || form.configuration === '1 RK' || form.configuration === 'Jad se' ? form.configuration : '2 BHK',
+                              sizeSqft: form.sizeSqft?.includes('Gaj') ? form.sizeSqft : '50 Gaj (450 sq.ft)',
+                            });
+                          }}
+                          className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
+                            (form.propertyCategory === 'Flat' || form.propertyCategory === 'HK' || form.propertyCategory === 'RK' || (!form.propertyCategory && form.propertyCategory !== 'Commercial' && form.propertyCategory !== 'Plot' && form.propertyCategory !== 'Office' && form.propertyCategory !== 'Shop'))
+                              ? 'bg-gradient-to-br from-orange-500/10 to-amber-500/15 border-orange-500 text-orange-950 font-black shadow-xs ring-2 ring-orange-500/30'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base">🏠</span>
+                            <span className="text-xs font-black">Flat</span>
+                          </div>
+                          <span className="text-[9px] text-slate-500 mt-0.5 leading-tight truncate">
+                            Builder Floor / Apt
+                          </span>
+                        </button>
+
+                        {/* 2. COMMERCIAL */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sub = form.commercialSubType || 'Office';
+                            setForm({
+                              ...form,
+                              propertyCategory: 'Commercial',
+                              commercialSubType: sub,
+                              configuration: sub === 'Office' ? 'Furnished Office' : 'Main Road Shop',
+                              sizeSqft: form.sizeSqft?.includes('sq.ft') ? form.sizeSqft : '500 sq.ft',
+                            });
+                          }}
+                          className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
+                            (form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop')
+                              ? 'bg-gradient-to-br from-blue-500/10 to-indigo-500/15 border-blue-600 text-blue-950 font-black shadow-xs ring-2 ring-blue-500/30'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base">🏢</span>
+                            <span className="text-xs font-black text-blue-900">Commercial</span>
+                          </div>
+                          <span className="text-[9px] text-blue-700 font-semibold mt-0.5 leading-tight truncate">
+                            Office &amp; Shop Space
+                          </span>
+                        </button>
+
+                        {/* 3. PLOT / LAND */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForm({
+                              ...form,
+                              propertyCategory: 'Plot',
+                              configuration: 'Residential Plot',
+                              sizeSqft: '100 Gaj (900 sq.ft)',
+                            });
+                          }}
+                          className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
+                            form.propertyCategory === 'Plot' || form.propertyCategory === 'Land'
+                              ? 'bg-gradient-to-br from-emerald-500/10 to-teal-500/15 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-500/30'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base">📐</span>
+                            <span className="text-xs font-black text-emerald-900">Plot / Land</span>
+                          </div>
+                          <span className="text-[9px] text-emerald-700 font-semibold mt-0.5 leading-tight truncate">
+                            Freehold Land
+                          </span>
                         </button>
                       </div>
                     </div>
                   </div>
+
+                  {/* Dynamic Sub-Panels */}
+                  {/* A) COMMERCIAL SUB-PANEL */}
+                  {(form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop') && (
+                    <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-blue-50/50 via-indigo-50/30 to-slate-50 border border-blue-200/80 space-y-3 animate-in fade-in duration-150">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-black text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <i className="ri-store-2-fill text-blue-600 text-xs" />
+                            Commercial Unit Type (Select Office or Shop)
+                          </label>
+                          <span className="text-[9px] font-bold text-blue-800 bg-blue-100/90 px-2 py-0.2 rounded border border-blue-200">
+                            Selected: <strong>{form.commercialSubType === 'Shop' ? 'Shop' : 'Office'}</strong>
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {/* 1. OFFICE */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm({
+                                ...form,
+                                propertyCategory: 'Commercial',
+                                commercialSubType: 'Office',
+                                configuration: 'Furnished Office',
+                                sizeSqft: form.sizeSqft?.includes('sq.ft') ? form.sizeSqft : '500 sq.ft',
+                              });
+                            }}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                              (form.commercialSubType === 'Office' || (!form.commercialSubType && form.propertyCategory !== 'Shop'))
+                                ? 'bg-white border-blue-600 text-blue-950 shadow-sm ring-2 ring-blue-500/40 font-black'
+                                : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="h-8 w-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-lg shrink-0">
+                                💼
+                              </span>
+                              <div>
+                                <span className="block font-black text-xs text-blue-950">Commercial Office</span>
+                                <span className="text-[9px] text-slate-500 font-medium">IT, Corporate Suites &amp; Cabins</span>
+                              </div>
+                            </div>
+                            {(form.commercialSubType === 'Office' || (!form.commercialSubType && form.propertyCategory !== 'Shop')) && (
+                              <i className="ri-checkbox-circle-fill text-blue-600 text-base" />
+                            )}
+                          </button>
+
+                          {/* 2. SHOP */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm({
+                                ...form,
+                                propertyCategory: 'Commercial',
+                                commercialSubType: 'Shop',
+                                configuration: 'Main Road Shop',
+                                sizeSqft: form.sizeSqft?.includes('sq.ft') ? form.sizeSqft : '200 sq.ft',
+                              });
+                            }}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                              form.commercialSubType === 'Shop'
+                                ? 'bg-white border-indigo-600 text-indigo-950 shadow-sm ring-2 ring-indigo-500/40 font-black'
+                                : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="h-8 w-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg shrink-0">
+                                🏪
+                              </span>
+                              <div>
+                                <span className="block font-black text-xs text-indigo-950">Retail Shop / Showroom</span>
+                                <span className="text-[9px] text-slate-500 font-medium">Market Fronts, Booths &amp; Retail</span>
+                              </div>
+                            </div>
+                            {form.commercialSubType === 'Shop' && (
+                              <i className="ri-checkbox-circle-fill text-indigo-600 text-base" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Specs */}
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 text-xs pt-1 border-t border-blue-100">
+                        <div className="md:col-span-7 space-y-1">
+                          <label className="text-[10px] font-bold text-slate-700 block">
+                            {form.commercialSubType === 'Shop' ? 'Shop Spec / Location' : 'Office Layout / Furnishing'}
+                            <span className="text-blue-600 font-bold ml-1">({form.configuration})</span>
+                          </label>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                            {(form.commercialSubType === 'Shop'
+                              ? ['Main Road Shop', 'Corner Shop', 'Ground Retail', 'Basement Godown', 'Showroom', 'Market Booth']
+                              : ['Furnished Office', 'Bare Shell', 'Semi-Furnished', 'Co-Working Hub', 'Cabin Suite', 'Full Floor']
+                            ).map((spec) => (
+                              <button
+                                key={spec}
+                                type="button"
+                                onClick={() => setForm({ ...form, configuration: spec })}
+                                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer border truncate text-center ${
+                                  form.configuration === spec
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-black'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-900'
+                                }`}
+                              >
+                                {spec}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="md:col-span-5 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold text-slate-700">Carpet / Super Area</label>
+                            <span className="text-[9px] text-slate-400 font-medium">Sq.ft / Gaj</span>
+                          </div>
+                          <input
+                            type="text"
+                            value={form.sizeSqft}
+                            onChange={(e) => setForm({ ...form, sizeSqft: e.target.value })}
+                            placeholder={form.commercialSubType === 'Shop' ? 'e.g. 200 sq.ft (22 Gaj)' : 'e.g. 500 sq.ft (55 Gaj)'}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-blue-500 outline-none text-xs font-bold text-slate-900"
+                          />
+                          <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                            {(form.commercialSubType === 'Shop'
+                              ? [
+                                  { label: '100 sq.ft', val: '100 sq.ft (11 Gaj)' },
+                                  { label: '200 sq.ft', val: '200 sq.ft (22 Gaj)' },
+                                  { label: '350 sq.ft', val: '350 sq.ft (39 Gaj)' },
+                                  { label: '500 sq.ft', val: '500 sq.ft (55 Gaj)' },
+                                ]
+                              : [
+                                  { label: '150 sq.ft', val: '150 sq.ft (16 Gaj)' },
+                                  { label: '300 sq.ft', val: '300 sq.ft (33 Gaj)' },
+                                  { label: '500 sq.ft', val: '500 sq.ft (55 Gaj)' },
+                                  { label: '1000 sq.ft', val: '1000 sq.ft (111 Gaj)' },
+                                ]
+                            ).map((preset) => (
+                              <button
+                                key={preset.label}
+                                type="button"
+                                onClick={() => setForm({ ...form, sizeSqft: preset.val })}
+                                className="px-1.5 py-0.5 rounded bg-white hover:bg-blue-100 text-[9px] font-bold text-slate-600 border border-slate-200 transition cursor-pointer"
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* B) FLAT (RESIDENTIAL) SUB-PANEL */}
+                  {(form.propertyCategory === 'Flat' || form.propertyCategory === 'HK' || form.propertyCategory === 'RK' || (!form.propertyCategory && form.propertyCategory !== 'Commercial' && form.propertyCategory !== 'Plot')) && (
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 text-xs p-3 rounded-2xl bg-orange-50/30 border border-orange-200/70">
+                      <div className="md:col-span-7 space-y-1">
+                        <label className="text-[10px] font-bold text-slate-700 block">
+                          BHK Configuration <span className="text-orange-600 font-bold">({form.configuration})</span>
+                        </label>
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+                          {['1 RK', '1 BHK', '2 BHK', '3 BHK', '4 BHK', 'Jad se'].map((bhk) => (
+                            <button
+                              key={bhk}
+                              type="button"
+                              onClick={() => setForm({ ...form, configuration: bhk })}
+                              className={`py-2 rounded-lg text-xs font-bold transition cursor-pointer border truncate text-center ${
+                                form.configuration === bhk
+                                  ? 'bg-orange-600 text-white border-orange-600 shadow-xs font-black'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-orange-50 hover:text-orange-950'
+                              }`}
+                            >
+                              {bhk}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-5 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-slate-700">Plot Size / Carpet Area</label>
+                          <span className="text-[9px] text-slate-400 font-medium">Gaj &amp; Sq.ft</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={form.sizeSqft}
+                          onChange={(e) => setForm({ ...form, sizeSqft: e.target.value })}
+                          placeholder="e.g. 50 Gaj (450 sq.ft)"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-orange-500 outline-none text-xs font-bold text-slate-900"
+                        />
+                        <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                          {[
+                            { label: '30G', val: '30 Gaj (270 sq.ft)' },
+                            { label: '40G', val: '40 Gaj (360 sq.ft)' },
+                            { label: '50G', val: '50 Gaj (450 sq.ft)' },
+                            { label: '60G', val: '60 Gaj (540 sq.ft)' },
+                            { label: '100G', val: '100 Gaj (900 sq.ft)' },
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => setForm({ ...form, sizeSqft: preset.val })}
+                              className="px-1.5 py-0.5 rounded bg-white hover:bg-orange-100 hover:text-orange-800 text-[9px] font-bold text-slate-600 border border-slate-200 transition cursor-pointer"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* C) PLOT / LAND SUB-PANEL */}
+                  {(form.propertyCategory === 'Plot' || form.propertyCategory === 'Land') && (
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 text-xs p-3 rounded-2xl bg-emerald-50/30 border border-emerald-200/70">
+                      <div className="md:col-span-7 space-y-1">
+                        <label className="text-[10px] font-bold text-slate-700 block">
+                          Land / Plot Category <span className="text-emerald-700 font-bold">({form.configuration})</span>
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                          {['Residential Plot', 'Commercial Plot', 'Industrial Land', 'Corner Plot', 'Agricultural'].map((pType) => (
+                            <button
+                              key={pType}
+                              type="button"
+                              onClick={() => setForm({ ...form, configuration: pType })}
+                              className={`py-2 rounded-lg text-xs font-bold transition cursor-pointer border truncate text-center ${
+                                form.configuration === pType
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs font-black'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50 hover:text-emerald-950'
+                              }`}
+                            >
+                              {pType}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-5 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-slate-700">Total Plot Area</label>
+                          <span className="text-[9px] text-slate-400 font-medium">Gaj / Sq.Yards</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={form.sizeSqft}
+                          onChange={(e) => setForm({ ...form, sizeSqft: e.target.value })}
+                          placeholder="e.g. 100 Gaj (900 sq.ft)"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-emerald-500 outline-none text-xs font-bold text-slate-900"
+                        />
+                        <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                          {[
+                            { label: '50G', val: '50 Gaj (450 sq.ft)' },
+                            { label: '100G', val: '100 Gaj (900 sq.ft)' },
+                            { label: '200G', val: '200 Gaj (1800 sq.ft)' },
+                            { label: '500G', val: '500 Gaj (4500 sq.ft)' },
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => setForm({ ...form, sizeSqft: preset.val })}
+                              className="px-1.5 py-0.5 rounded bg-white hover:bg-emerald-100 hover:text-emerald-800 text-[9px] font-bold text-slate-600 border border-slate-200 transition cursor-pointer"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* 3. Title & Location with Quick Tags */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
@@ -1679,18 +2023,25 @@ export default function EmployeeDashboard() {
                   <div className="flex items-center gap-1.5 flex-wrap text-xs">
                     {/* Unit Categories */}
                     <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200/80 flex-wrap">
-                      {['all', 'HK', 'RK', 'Plot', 'Shop'].map((cat) => (
+                      {[
+                        { id: 'all', label: 'All Units' },
+                        { id: 'Flat', label: '🏠 Flat' },
+                        { id: 'Commercial', label: '🏢 Commercial' },
+                        { id: 'Office', label: '💼 Office' },
+                        { id: 'Shop', label: '🏪 Shop' },
+                        { id: 'Plot', label: '📐 Plot' },
+                      ].map((cat) => (
                         <button
-                          key={cat}
+                          key={cat.id}
                           type="button"
-                          onClick={() => setFilterCategory(cat)}
+                          onClick={() => setFilterCategory(cat.id)}
                           className={`px-2.5 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
-                            filterCategory === cat
+                            filterCategory === cat.id
                               ? 'bg-orange-600 text-white shadow-2xs'
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          {cat === 'all' ? 'All Units' : cat}
+                          {cat.label}
                         </button>
                       ))}
                     </div>

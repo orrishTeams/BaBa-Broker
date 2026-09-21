@@ -5,7 +5,6 @@ import { useSalesmanDashboard } from '../hooks/useSalesmanDashboard';
 import DashboardTopNav from '../components/dashboard/DashboardTopNav';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardMetricsGrid from '../components/dashboard/DashboardMetricsGrid';
-import CalculatorsPanel from '../components/dashboard/CalculatorsPanel';
 import AssignedLeadsPanel from '../components/AssignedLeadsPanel';
 import PropertyTable from '../components/properties/PropertyTable';
 import PropertyGrid from '../components/properties/PropertyGrid';
@@ -65,7 +64,6 @@ export default function SalesmanDashboard() {
     { id: 'list', label: 'Property Inventory', icon: 'ri-home-8-line', activeIcon: 'ri-home-8-fill' },
     { id: 'add', label: editingId ? 'Edit Property' : 'Onboard Property', icon: 'ri-add-circle-line', activeIcon: 'ri-add-circle-fill' },
     { id: 'leads', label: 'Assigned Leads', icon: 'ri-user-star-line', activeIcon: 'ri-user-star-fill' },
-    { id: 'calculator', label: 'Deal Calculator', icon: 'ri-calculator-line', activeIcon: 'ri-calculator-fill' },
   ];
 
   return (
@@ -416,9 +414,6 @@ export default function SalesmanDashboard() {
                 <AssignedLeadsPanel />
               </div>
             )}
-
-            {/* ─── TAB 4: CALCULATORS & CONVERTERS ─── */}
-            {view === 'calculator' && <CalculatorsPanel />}
           </main>
         </div>
       </div>

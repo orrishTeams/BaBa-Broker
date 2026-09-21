@@ -5,7 +5,6 @@ import { useEmployeeDashboard } from '../hooks/useEmployeeDashboard';
 import DashboardTopNav from '../components/dashboard/DashboardTopNav';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardMetricsGrid from '../components/dashboard/DashboardMetricsGrid';
-import CalculatorsPanel from '../components/dashboard/CalculatorsPanel';
 import ComplianceChecklist from '../components/dashboard/ComplianceChecklist';
 import AssignedLeadsPanel from '../components/AssignedLeadsPanel';
 import AdminExcelView from '../components/admin/AdminExcelView';
@@ -71,7 +70,6 @@ export default function EmployeeDashboard() {
     { id: 'excel', label: 'Excel Import', icon: 'ri-file-excel-2-line', activeIcon: 'ri-file-excel-2-fill' },
     { id: 'leads', label: 'Assigned Leads', icon: 'ri-user-star-line', activeIcon: 'ri-user-star-fill' },
     { id: 'compliance', label: 'Operations Audit', icon: 'ri-shield-check-line', activeIcon: 'ri-shield-check-fill' },
-    { id: 'calculator', label: 'Deal Calculator', icon: 'ri-calculator-line', activeIcon: 'ri-calculator-fill' },
   ];
 
   return (
@@ -490,9 +488,6 @@ export default function EmployeeDashboard() {
 
             {/* ─── TAB 5: COMPLIANCE CHECKLIST ─── */}
             {view === 'compliance' && <ComplianceChecklist />}
-
-            {/* ─── TAB 6: CALCULATORS & CONVERTERS ─── */}
-            {view === 'calculator' && <CalculatorsPanel />}
           </main>
         </div>
       </div>

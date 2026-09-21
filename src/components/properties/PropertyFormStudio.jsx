@@ -16,11 +16,13 @@ export default function PropertyFormStudio({
   setForm,
   editingId,
   setEditingId,
+  onSubmit,
   onSave,
   onCancel,
   saving = false,
   roleBadge = 'New Listing',
 }) {
+  const handleSubmit = onSubmit || onSave || ((e) => e?.preventDefault?.());
   const [isCustomFloor, setIsCustomFloor] = useState(
     () =>
       Boolean(form.floor) &&
@@ -94,7 +96,7 @@ export default function PropertyFormStudio({
   };
 
   return (
-    <form onSubmit={onSave} className="space-y-3 w-full pb-6">
+    <form onSubmit={handleSubmit} className="space-y-3 w-full pb-6">
       {/* 1. Header Banner */}
       <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
         <PageHeader

@@ -4,12 +4,7 @@ import FlatListing from '../models/FlatListing.js';
 const validListing = (input) => {
   if (!input) return false;
   const listingType = input.listingType || 'buy';
-  const hasType = ['rent', 'buy'].includes(listingType);
-  const hasPrice =
-    listingType === 'rent'
-      ? Number(input.monthlyRent) > 0 || Number(input.salePrice) > 0
-      : Number(input.salePrice) > 0 || Number(input.monthlyRent) > 0;
-  return hasType && hasPrice;
+  return ['rent', 'buy'].includes(listingType);
 };
 
 const listingData = (input) => ({

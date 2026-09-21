@@ -46,6 +46,9 @@ const flatListingSchema = new mongoose.Schema(
 
     dealStatus: { type: String, enum: ['available', 'rented', 'sold'], default: 'available' },
     submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    addedByName: { type: String, trim: true, default: '' },
+    addedByRole: { type: String, trim: true, default: '' },
+    addedByPhone: { type: String, trim: true, default: '' },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true, versionKey: false }

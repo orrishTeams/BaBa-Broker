@@ -156,6 +156,9 @@ export function useSalesmanDashboard() {
         securityDeposit: Number(form.securityDeposit) || 0,
         maintenanceCharge: Number(form.maintenanceCharge) || 0,
         isVerified: true,
+        addedByName: salesmanName || auth?.user?.name || 'Sales Executive',
+        addedByRole: 'salesman',
+        addedByPhone: auth?.user?.phone || '',
       };
 
       if (editingId) {

@@ -148,11 +148,29 @@ export default function PropertyTable({
                   </span>
                 </td>
 
-                {/* 8. BY */}
+                {/* 8. BY (Added By) */}
                 <td className={`py-2 px-2 border-r border-slate-200/70 whitespace-nowrap ${isClosed ? 'opacity-50' : ''}`}>
-                  <span className="font-bold text-slate-700 text-[11px] block truncate max-w-[85px]" title={item.ownerName || '—'}>
-                    {item.ownerName || '—'}
-                  </span>
+                  {(() => {
+                    const rawName = item.addedByName || item.submittedBy?.name || '';
+                    const role = item.addedByRole || item.submittedBy?.role || 'staff';
+                    const displayName = rawName || (role === 'admin' ? 'Admin' : role === 'salesman' ? 'Sales Desk' : 'Operations');
+                    const roleBadgeClass =
+                      role === 'admin'
+                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                        : role === 'salesman'
+                        ? 'bg-orange-50 text-orange-700 border-orange-200'
+                        : 'bg-blue-50 text-blue-700 border-blue-200';
+                    return (
+                      <div className="flex flex-col min-w-0" title={`Added by: ${displayName} (${role.toUpperCase()})`}>
+                        <span className="font-bold text-slate-800 text-[11px] truncate max-w-[95px] block leading-tight">
+                          {displayName}
+                        </span>
+                        <span className={`inline-block px-1 py-0.2 rounded text-[8.5px] font-black uppercase tracking-wider border w-fit leading-none mt-0.5 ${roleBadgeClass}`}>
+                          {role}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </td>
 
                 {/* 9. VERIFIED (ONLY FOR EMPLOYEE) */}

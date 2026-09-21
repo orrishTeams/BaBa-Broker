@@ -324,6 +324,40 @@ export default function PropertyDetailsDrawer({
               </div>
             )}
           </div>
+
+          {/* 7. Listing Attribution & Provenance */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+            <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center justify-between">
+              <span>Added By / Listing Attribution</span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {property.createdAt ? new Date(property.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent'}
+              </span>
+            </h4>
+            <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                  {((property.addedByName || property.submittedBy?.name || 'S')[0] || 'S').toUpperCase()}
+                </div>
+                <div>
+                  <span className="text-xs font-black text-slate-900 block leading-tight">
+                    {property.addedByName || property.submittedBy?.name || 'Authorized Staff'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    {property.addedByPhone || property.submittedBy?.phone || property.submittedBy?.email || 'Direct Entry'}
+                  </span>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase border ${
+                (property.addedByRole || property.submittedBy?.role) === 'admin'
+                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                  : (property.addedByRole || property.submittedBy?.role) === 'salesman'
+                  ? 'bg-orange-50 text-orange-700 border-orange-200'
+                  : 'bg-blue-50 text-blue-700 border-blue-200'
+              }`}>
+                {property.addedByRole || property.submittedBy?.role || 'Staff'}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Drawer Bottom Actions */}

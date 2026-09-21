@@ -172,6 +172,9 @@ export function useEmployeeDashboard() {
         securityDeposit: Number(form.securityDeposit) || 0,
         maintenanceCharge: Number(form.maintenanceCharge) || 0,
         isVerified: true,
+        addedByName: employeeName || auth?.user?.name || 'Operations Employee',
+        addedByRole: 'employee',
+        addedByPhone: auth?.user?.phone || '',
       };
 
       if (editingId) {

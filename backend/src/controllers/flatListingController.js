@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import FlatListing from '../models/FlatListing.js';
+import User from '../models/User.js';
 
 const validListing = (input) => {
   if (!input) return false;
@@ -54,7 +55,7 @@ const listingData = (input) => ({
 export const getFlatListings = async (req, res) => {
   const filter = req.user.role === 'admin' ? {} : { isActive: true };
   const listings = await FlatListing.find(filter)
-    .populate('submittedBy', 'name email phone')
+    .populate('submittedBy', 'name email phone role')
     .sort({ createdAt: -1 })
     .lean();
   res.status(200).json(listings);
@@ -65,8 +66,41 @@ export const createFlatListing = async (req, res) => {
   if (!validListing(input)) {
     return res.status(400).json({ error: 'Valid listing type and price (sale price or monthly rent) are required.' });
   }
-  const listing = await FlatListing.create({ ...listingData(input), submittedBy: req.user.id });
-  res.status(201).json(listing);
+
+  let creatorName = String(input.addedByName || '').trim();
+  let creatorRole = String(input.addedByRole || req.user.role || '').trim();
+  let creatorPhone = String(input.addedByPhone || '').trim();
+
+  // If user details not in payload, resolve from database
+  if (!creatorName || !creatorPhone) {
+    try {
+      const u = await User.findById(req.user.id).select('name role phone').lean();
+      if (u) {
+        creatorName = creatorName || u.name;
+        creatorRole = creatorRole || u.role;
+        creatorPhone = creatorPhone || u.phone;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  creatorName = creatorName || (req.user.role === 'admin' ? 'Admin' : req.user.role === 'salesman' ? 'Sales Executive' : 'Operations Employee');
+  creatorRole = creatorRole || req.user.role || 'staff';
+
+  const listing = await FlatListing.create({
+    ...listingData(input),
+    submittedBy: req.user.id,
+    addedByName: creatorName,
+    addedByRole: creatorRole,
+    addedByPhone: creatorPhone,
+  });
+
+  const populated = await FlatListing.findById(listing._id)
+    .populate('submittedBy', 'name email phone role')
+    .lean();
+
+  res.status(201).json(populated || listing);
 };
 
 export const updateFlatListing = async (req, res) => {

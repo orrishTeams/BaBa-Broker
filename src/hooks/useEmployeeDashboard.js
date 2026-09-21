@@ -154,15 +154,23 @@ export function useEmployeeDashboard() {
 
   // Actions
   const handleSaveListing = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setSaving(true);
     setStatus('');
     try {
+      const loc = form.location?.trim() || form.completeAddress?.trim() || 'Delhi NCR';
+      const conf = form.configuration?.trim() || '2 BHK';
       const payload = {
         ...form,
-        salePrice: form.salePrice ? Number(form.salePrice) : undefined,
-        monthlyRent: form.monthlyRent ? Number(form.monthlyRent) : undefined,
-        netProfit: form.netProfit ? Number(form.netProfit) : undefined,
+        title: form.title?.trim() || `${conf} in ${loc}`.trim(),
+        description: form.description?.trim() || `${conf} property located at ${loc}`.trim(),
+        location: loc,
+        configuration: conf,
+        salePrice: Number(form.salePrice) || 0,
+        monthlyRent: Number(form.monthlyRent) || 0,
+        netProfit: Number(form.netProfit) || 0,
+        securityDeposit: Number(form.securityDeposit) || 0,
+        maintenanceCharge: Number(form.maintenanceCharge) || 0,
         isVerified: true,
       };
 
@@ -187,6 +195,7 @@ export function useEmployeeDashboard() {
       setEditingId(null);
       setView('list');
     } catch (err) {
+      console.error('Failed to save listing:', err);
       setStatus(err.message || 'Failed to save listing.');
     } finally {
       setSaving(false);

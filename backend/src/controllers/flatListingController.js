@@ -1,67 +1,63 @@
 import mongoose from 'mongoose';
 import FlatListing from '../models/FlatListing.js';
 
-const validListing = (input) =>
-  input &&
-  ['rent', 'buy'].includes(input.listingType) &&
-  Boolean(input.location && String(input.location).trim()) &&
-  Boolean(input.configuration && String(input.configuration).trim()) &&
-  (input.listingType === 'rent'
-    ? Number(input.monthlyRent) > 0 || Number(input.salePrice) > 0
-    : Number(input.salePrice) > 0 || Number(input.monthlyRent) > 0);
+const validListing = (input) => {
+  if (!input) return false;
+  const listingType = input.listingType || 'buy';
+  const hasType = ['rent', 'buy'].includes(listingType);
+  const hasPrice =
+    listingType === 'rent'
+      ? Number(input.monthlyRent) > 0 || Number(input.salePrice) > 0
+      : Number(input.salePrice) > 0 || Number(input.monthlyRent) > 0;
+  return hasType && hasPrice;
+};
 
 const listingData = (input) => ({
   listingType: input.listingType || 'buy',
-  title: input.title?.trim() || `${input.configuration || 'Property'} at ${input.location || ''}`.trim(),
-  location: String(input.location || '').trim(),
+  title: input.title?.trim() || `${input.configuration || '2 BHK'} at ${input.location || 'Delhi NCR'}`.trim(),
+  location: String(input.location || 'Delhi NCR').trim(),
   configuration: String(input.configuration || '2 BHK').trim(),
-  sizeSqft: String(input.sizeSqft || '').trim(),
-  floor: String(input.floor || '').trim(),
-  totalFloors: String(input.totalFloors || '').trim(),
+  sizeSqft: String(input.sizeSqft || '50 Gaj (450 sq.ft)').trim(),
+  floor: String(input.floor || 'Ground Floor (Front Side)').trim(),
+  totalFloors: String(input.totalFloors || '4').trim(),
   lift: String(input.lift || '').toUpperCase() === 'NO' ? 'NO' : 'YES',
-  parking: String(input.parking || '').trim(),
+  parking: String(input.parking || 'Car + Bike Parking').trim(),
   possessionStatus: String(input.possessionStatus || 'Ready to Move').trim(),
-  constructionYear: String(input.constructionYear || '').trim(),
-  facing: String(input.facing || '').trim(),
+  constructionYear: String(input.constructionYear || '2023').trim(),
+  facing: String(input.facing || 'East').trim(),
   reraId: String(input.reraId || 'RERA Not Applicable').trim(),
-  amenities: String(input.amenities || '').trim(),
-  description: String(input.description || `${input.configuration || 'Property'} located at ${input.location || ''}`).trim(),
+  amenities: String(input.amenities || '24x7 Security, Power Backup, Lift(s)').trim(),
+  description: String(input.description || `${input.configuration || '2 BHK'} located at ${input.location || 'Delhi NCR'}`).trim(),
   coverImage: input.coverImage || '',
   images: Array.isArray(input.images) ? input.images : [],
   videoUrl: String(input.videoUrl || '').trim(),
   monthlyRent: Number(input.monthlyRent) || 0,
   securityDeposit: Number(input.securityDeposit) || 0,
   maintenanceCharge: Number(input.maintenanceCharge) || 0,
-  availableFrom: String(input.availableFrom || '').trim(),
+  availableFrom: String(input.availableFrom || 'Immediate').trim(),
   salePrice: Number(input.salePrice) || 0,
   pricePerSqft: Number(input.pricePerSqft) || 0,
-  priceNegotiable: Boolean(input.priceNegotiable),
+  priceNegotiable: input.priceNegotiable !== false,
 
   ownerName: String(input.ownerName || '').trim(),
   ownerContact: String(input.ownerContact || '').trim(),
   propertyCategory: String(input.propertyCategory || 'Flat').trim(),
   commercialSubType: String(input.commercialSubType || '').trim(),
-  furnishingStatus: String(input.furnishingStatus || 'Unfurnished').trim(),
+  furnishingStatus: String(input.furnishingStatus || 'Semi-Furnished').trim(),
   completeAddress: String(input.completeAddress || '').trim(),
   latitude: String(input.latitude || '').trim(),
   longitude: String(input.longitude || '').trim(),
-  commission: String(input.commission || '').trim(),
+  commission: String(input.commission || 'YES').trim(),
   specialInstructions: String(input.specialInstructions || '').trim(),
   netProfit: Number(input.netProfit) || 0,
 
   dealStatus: ['available', 'rented', 'sold'].includes(input.dealStatus) ? input.dealStatus : 'available',
 });
 
-// Salesman -> only their own listings (any status, so they can manage them).
-// Employee -> active listings only (what's actually shareable with customers).
-// Admin -> everything, for a full audit trail.
+// Salesman & Employee -> active inventory so they can pitch and manage
+// Admin -> everything, for full audit trail
 export const getFlatListings = async (req, res) => {
-  const filter =
-    req.user.role === 'salesman'
-      ? { submittedBy: req.user.id }
-      : req.user.role === 'employee'
-      ? { isActive: true }
-      : {};
+  const filter = req.user.role === 'admin' ? {} : { isActive: true };
   const listings = await FlatListing.find(filter)
     .populate('submittedBy', 'name email phone')
     .sort({ createdAt: -1 })
@@ -72,7 +68,7 @@ export const getFlatListings = async (req, res) => {
 export const createFlatListing = async (req, res) => {
   const input = req.body;
   if (!validListing(input)) {
-    return res.status(400).json({ error: 'Listing type, location, configuration, description and pricing are required.' });
+    return res.status(400).json({ error: 'Valid listing type and price (sale price or monthly rent) are required.' });
   }
   const listing = await FlatListing.create({ ...listingData(input), submittedBy: req.user.id });
   res.status(201).json(listing);

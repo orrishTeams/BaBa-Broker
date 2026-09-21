@@ -189,7 +189,16 @@ export default function AssignedLeadsPanel({
   const loadLeads = async () => {
     setLoading(true);
     try {
-      const data = await api('/api/investment-requests');
+      let data;
+      try {
+        data = await api('/api/investment-requests/mine');
+      } catch (e) {
+        if (e?.status === 403 || e?.status === 404) {
+          data = await api('/api/investment-requests');
+        } else {
+          throw e;
+        }
+      }
       setLeads(Array.isArray(data) ? data : []);
     } catch {
       setLeads([]);

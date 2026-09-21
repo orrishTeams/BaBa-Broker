@@ -175,28 +175,31 @@ function CompactLeadCard({ lead, onUpdate, updating }) {
   );
 }
 
-export default function AssignedLeadsPanel() {
+export default function AssignedLeadsPanel({
+  title = 'Client & Buyer Inquiry Desk',
+  subtitle = 'Assigned buyer leads and site visit scheduling',
+}) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState('');
-  const [updatingId, setUpdatingId] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchLead, setSearchLead] = useState('');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+  const [status, setStatus] = useState('');
+  const [updatingId, setUpdatingId] = useState(null);
 
-  const load = async () => {
+  const loadLeads = async () => {
+    setLoading(true);
     try {
-      const data = await api('/api/investment-requests/mine');
+      const data = await api('/api/investment-requests');
       setLeads(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setStatus(err.message || 'Failed to load leads.');
+    } catch {
+      setLeads([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    load();
+    loadLeads();
   }, []);
 
   const updateLead = async (id, followUpStatus, note) => {
@@ -257,7 +260,74 @@ export default function AssignedLeadsPanel() {
         </div>
       )}
 
-      {/* 1. Compact KPI Strip */}
+      {/* 1. Unified Header Bar: Title + Search + Filter Options Next To It */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+        {/* Title */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="h-7 w-7 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-xs shrink-0">
+            <i className="ri-user-star-fill" />
+          </div>
+          <div>
+            <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+              {title}
+              <span className="px-1.5 py-0.2 rounded-full text-[9.5px] font-black bg-orange-50 text-orange-700 border border-orange-200">
+                {filteredLeads.length}
+              </span>
+            </h2>
+            <p className="text-[10.5px] text-slate-400">{subtitle}</p>
+          </div>
+        </div>
+
+        {/* Right Side: Search Bar + Filter Options Next To Each Other */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Search Input */}
+          <div className="relative w-full sm:w-56">
+            <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+            <input
+              type="text"
+              value={searchLead}
+              onChange={(e) => setSearchLead(e.target.value)}
+              placeholder="Search lead name, phone, area..."
+              className="w-full pl-7 pr-7 py-1 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 outline-none text-xs font-medium shadow-2xs"
+            />
+            {searchLead && (
+              <button
+                type="button"
+                onClick={() => setSearchLead('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <i className="ri-close-line text-xs" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1 overflow-x-auto text-xs">
+            {[
+              { id: 'all', label: `All (${leads.length})` },
+              { id: 'unassigned', label: `New (${leadStats.newLeads})` },
+              { id: 'site_visit_scheduled', label: `Visits (${leadStats.siteVisits})` },
+              { id: 'negotiating', label: `Negotiating (${leadStats.negotiating})` },
+              { id: 'converted', label: `Converted (${leadStats.converted})` },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setFilterStatus(tab.id)}
+                className={`px-2.5 py-1 rounded-xl font-bold text-[11px] transition cursor-pointer select-none ${
+                  filterStatus === tab.id
+                    ? 'bg-[#ea580c] text-white shadow-2xs font-black'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Compact KPI Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         <div className="bg-white px-3 py-2 rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between">
           <div>
@@ -291,45 +361,6 @@ export default function AssignedLeadsPanel() {
             <span className="text-sm font-black text-emerald-700">{leadStats.converted}</span>
           </div>
           <i className="ri-checkbox-circle-fill text-emerald-500 text-base" />
-        </div>
-      </div>
-
-      {/* 2. Compact Search & Filter Strip */}
-      <div className="bg-white px-3 py-2 rounded-xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-2">
-        {/* Search Input */}
-        <div className="relative w-full sm:max-w-xs">
-          <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
-          <input
-            type="text"
-            value={searchLead}
-            onChange={(e) => setSearchLead(e.target.value)}
-            placeholder="Search lead name, phone, area..."
-            className="w-full pl-7 pr-3 py-1 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 outline-none text-xs font-medium"
-          />
-        </div>
-
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1 flex-wrap w-full sm:w-auto overflow-x-auto text-xs">
-          {[
-            { id: 'all', label: `All (${leads.length})` },
-            { id: 'unassigned', label: `New (${leadStats.newLeads})` },
-            { id: 'site_visit_scheduled', label: `Visits (${leadStats.siteVisits})` },
-            { id: 'negotiating', label: `Negotiating (${leadStats.negotiating})` },
-            { id: 'converted', label: `Converted (${leadStats.converted})` },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setFilterStatus(tab.id)}
-              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
-                filterStatus === tab.id
-                  ? 'bg-orange-600 text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
         </div>
       </div>
 

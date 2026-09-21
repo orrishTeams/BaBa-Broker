@@ -66,7 +66,7 @@ export default function EmployeeDashboard() {
   const navItems = [
     { id: 'overview', label: 'Operations Command', icon: 'ri-dashboard-3-line', activeIcon: 'ri-dashboard-3-fill' },
     { id: 'list', label: 'Company Inventory', icon: 'ri-building-line', activeIcon: 'ri-building-fill' },
-    { id: 'add', label: editingId ? 'Edit Property' : 'Audit & Onboard', icon: 'ri-add-circle-line', activeIcon: 'ri-add-circle-fill' },
+    { id: 'add', label: editingId ? 'Edit Property' : 'Add Property', icon: 'ri-add-circle-line', activeIcon: 'ri-add-circle-fill' },
     { id: 'excel', label: 'Excel Import', icon: 'ri-file-excel-2-line', activeIcon: 'ri-file-excel-2-fill' },
     { id: 'leads', label: 'Assigned Leads', icon: 'ri-user-star-line', activeIcon: 'ri-user-star-fill' },
     { id: 'compliance', label: 'Operations Audit', icon: 'ri-shield-check-line', activeIcon: 'ri-shield-check-fill' },
@@ -154,7 +154,7 @@ export default function EmployeeDashboard() {
                         }}
                         className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
                       >
-                        <i className="ri-add-line text-sm" /> Audit & Onboard
+                        <i className="ri-add-line text-sm" /> Add Property
                       </button>
                       <button
                         type="button"
@@ -474,15 +474,10 @@ export default function EmployeeDashboard() {
             {/* ─── TAB 4: CLIENT INQUIRIES & LEADS ─── */}
             {view === 'leads' && (
               <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-2xs space-y-3 w-full">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div>
-                    <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                      Operations Inquiry Desk
-                    </h2>
-                    <p className="text-[11px] text-slate-400">Assigned customer inquiries & follow-ups</p>
-                  </div>
-                </div>
-                <AssignedLeadsPanel />
+                <AssignedLeadsPanel
+                  title="Operations Inquiry Desk"
+                  subtitle="Assigned customer inquiries & follow-ups"
+                />
               </div>
             )}
 

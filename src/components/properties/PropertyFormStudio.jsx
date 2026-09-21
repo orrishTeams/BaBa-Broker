@@ -99,7 +99,7 @@ export default function PropertyFormStudio({
       <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
         <PageHeader
           icon={editingId ? 'ri-edit-2-line' : 'ri-building-2-fill'}
-          title={editingId ? 'Edit Property Listing' : 'Property Onboarding Studio'}
+          title={editingId ? 'Edit Property' : 'Add Property'}
           badge={editingId ? 'Editing Mode' : roleBadge}
           subtitle="Structured data entry • Auto-generates WhatsApp pitch flyer & CRM sync"
           className="pb-0 border-b-0"
@@ -141,7 +141,7 @@ export default function PropertyFormStudio({
         {/* Step Header */}
         <div className="flex items-center justify-between pb-2 border-b border-orange-100/70">
           <div className="flex items-center gap-2">
-            <span className="h-5.5 w-5.5 rounded-lg bg-orange-600 text-white flex items-center justify-center font-black text-[11px] shadow-xs">
+            <span className="h-6 w-6 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center font-black text-xs shadow-xs ring-2 ring-orange-200 shrink-0">
               1
             </span>
             <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -151,7 +151,7 @@ export default function PropertyFormStudio({
               </span>
             </h3>
           </div>
-          <span className="text-[10px] font-black text-orange-700 bg-orange-50 px-2.5 py-0.5 rounded-md border border-orange-200/70">
+          <span className="text-[10px] font-black text-orange-700 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200">
             Step 1 of 3
           </span>
         </div>
@@ -562,14 +562,14 @@ export default function PropertyFormStudio({
       <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 space-y-3 shadow-2xs">
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <span className="h-5 w-5 rounded-lg bg-orange-600 text-white flex items-center justify-center font-black text-[10px]">
+            <span className="h-6 w-6 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center font-black text-xs shadow-xs ring-2 ring-orange-200 shrink-0">
               2
             </span>
             <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
               Floor Position, Location &amp; Parking Infrastructure
             </h3>
           </div>
-          <span className="text-[10px] font-black text-orange-700 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200/70">
+          <span className="text-[10px] font-black text-orange-700 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200">
             Step 2 of 3
           </span>
         </div>
@@ -842,14 +842,14 @@ export default function PropertyFormStudio({
       <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 space-y-3 shadow-2xs">
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <span className="h-5 w-5 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-black text-[10px]">
+            <span className="h-6 w-6 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-black text-xs shadow-xs ring-2 ring-emerald-200 shrink-0">
               3
             </span>
             <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
-              {form.listingType === 'rent' ? 'Pricing, Owner & Media' : 'Pricing, Owner & Media'}
+              Pricing, Owner &amp; Media
             </h3>
           </div>
-          <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70">
+          <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
             Step 3 of 3
           </span>
         </div>

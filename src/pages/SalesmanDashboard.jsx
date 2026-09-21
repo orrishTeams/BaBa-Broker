@@ -62,7 +62,7 @@ export default function SalesmanDashboard() {
   const navItems = [
     { id: 'overview', label: 'Executive Overview', icon: 'ri-dashboard-3-line', activeIcon: 'ri-dashboard-3-fill' },
     { id: 'list', label: 'Property Inventory', icon: 'ri-home-8-line', activeIcon: 'ri-home-8-fill' },
-    { id: 'add', label: editingId ? 'Edit Property' : 'Onboard Property', icon: 'ri-add-circle-line', activeIcon: 'ri-add-circle-fill' },
+    { id: 'add', label: editingId ? 'Edit Property' : 'Add Property', icon: 'ri-add-circle-line', activeIcon: 'ri-add-circle-fill' },
     { id: 'leads', label: 'Assigned Leads', icon: 'ri-user-star-line', activeIcon: 'ri-user-star-fill' },
   ];
 
@@ -403,14 +403,6 @@ export default function SalesmanDashboard() {
             {/* ─── TAB 3: CLIENT INQUIRIES & LEADS ─── */}
             {view === 'leads' && (
               <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-2xs space-y-3 w-full">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div>
-                    <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                      Client & Buyer Inquiry Desk
-                    </h2>
-                    <p className="text-[11px] text-slate-400">Assigned buyer leads and site visit scheduling</p>
-                  </div>
-                </div>
                 <AssignedLeadsPanel />
               </div>
             )}

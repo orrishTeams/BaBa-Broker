@@ -1,131 +1,60 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { getAuth, clearAuth } from '../store/auth';
 import { useAppDispatch } from '../store';
 import { logoutAction } from '../store/authSlice';
-import AssignedLeadsPanel from '../components/AssignedLeadsPanel';
+
+// Reusable Components & Utilities
 import PageHeader from '../components/common/PageHeader';
+import DashboardTopNav from '../components/dashboard/DashboardTopNav';
+import DashboardSidebar from '../components/dashboard/DashboardSidebar';
+import DashboardMetricsGrid from '../components/dashboard/DashboardMetricsGrid';
+import CalculatorsPanel from '../components/dashboard/CalculatorsPanel';
+import AssignedLeadsPanel from '../components/AssignedLeadsPanel';
+import PropertyTable from '../components/properties/PropertyTable';
+import PropertyGrid from '../components/properties/PropertyGrid';
+import PropertyFormStudio from '../components/properties/PropertyFormStudio';
+import PropertyDetailsDrawer from '../components/properties/PropertyDetailsDrawer';
+import WhatsAppPitchModal from '../components/properties/WhatsAppPitchModal';
 
-const QUICK_AMENITIES = [
-  'Lift(s)',
-  '24x7 Security',
-  'Gated Community',
-  'Car & Bike Parking',
-  'Power Backup',
-  '24hr Water Supply',
-  'Modular Kitchen',
-  'Private Balcony',
-  'Park / Garden',
-  'Gymnasium',
-  'Near Metro Station',
-  'CCTV Surveillance',
-];
-
-const emptyFlatListing = () => ({
-  ownerName: '',
-  ownerContact: '',
-  propertyCategory: 'Flat',
-  commercialSubType: 'Office',
-  furnishingStatus: 'Semi-Furnished',
-  floor: 'Ground Floor (Front Side)',
-  completeAddress: '',
-  latitude: '',
-  longitude: '',
-  commission: 'YES',
-  specialInstructions: '',
-  netProfit: '',
-  listingType: 'buy',
-  title: '',
-  location: '',
-  configuration: '2 BHK',
-  sizeSqft: '50 Gaj (450 sq.ft)',
-  totalFloors: '4',
-  lift: 'YES',
-  parking: 'Car + Bike Parking',
-  possessionStatus: 'Ready to Move',
-  constructionYear: '2023',
-  facing: 'East',
-  reraId: 'RERA Not Applicable',
-  amenities: '24x7 Security, Power Backup, Lift(s)',
-  description: '',
-  coverImage: '',
-  images: [],
-  videoUrl: '',
-  monthlyRent: '',
-  securityDeposit: '',
-  maintenanceCharge: '',
-  availableFrom: 'Immediate',
-  salePrice: '',
-  pricePerSqft: '',
-  priceNegotiable: true,
-  dealStatus: 'available',
-});
-
-const fileToBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-  });
-
-const formatINR = (val) => {
-  const num = Number(val);
-  if (!num || isNaN(num)) return '—';
-  if (num >= 10000000) {
-    return `₹ ${(num / 10000000).toFixed(2).replace(/\.00$/, '')} Cr`;
-  }
-  if (num >= 100000) {
-    return `₹ ${(num / 100000).toFixed(2).replace(/\.00$/, '')} L`;
-  }
-  return `₹ ${num.toLocaleString('en-IN')}`;
-};
-
-const priceLabel = (listing) =>
-  listing.listingType === 'rent' && listing.monthlyRent
-    ? `${formatINR(listing.monthlyRent)}/mo`
-    : formatINR(listing.salePrice);
+import {
+  emptyFlatListing,
+  formatINR,
+  priceLabel,
+} from '../utils/propertyConstants';
 
 export default function SalesmanDashboard() {
   const navigate = useNavigate();
   const auth = getAuth();
+  const dispatch = useAppDispatch();
+  const salesmanName = auth?.name || 'Sales Executive';
+
+  // Navigation State
   const [view, setView] = useState('overview'); // 'overview' | 'list' | 'add' | 'leads' | 'calculator'
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [dutyStatus, setDutyStatus] = useState('online');
+
+  // Listings & Form State
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyFlatListing());
   const [editingId, setEditingId] = useState(null);
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
-  const [viewingProperty, setViewingProperty] = useState(null);
-  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
-  const [pitchingProperty, setPitchingProperty] = useState(null);
-  const [pitchClientName, setPitchClientName] = useState('');
-  const [pitchClientPhone, setPitchClientPhone] = useState('');
-  const [searchVal, setSearchVal] = useState('');
-  const [dutyStatus, setDutyStatus] = useState('online');
-  const [isCustomFloor, setIsCustomFloor] = useState(false);
 
-  // Listing Filters
+  // Modals & Drawers
+  const [viewingProperty, setViewingProperty] = useState(null);
+  const [pitchingProperty, setPitchingProperty] = useState(null);
+
+  // Filters & Pagination
+  const [searchVal, setSearchVal] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [filterPrice, setFilterPrice] = useState('all');
-  const [priceSort, setPriceSort] = useState('none'); // 'none', 'asc' (Low to High), 'desc' (High to Low)
-  const [layoutMode, setLayoutMode] = useState('table');
+  const [inventoryViewMode, setInventoryViewMode] = useState('table'); // 'table' | 'grid'
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 15;
-
-  // Calculator State
-  const [calcPrice, setCalcPrice] = useState('2500000');
-  const [calcBrokeragePct, setCalcBrokeragePct] = useState(1);
-  const [calcLoanAmount, setCalcLoanAmount] = useState('2000000');
-  const [calcInterestRate, setCalcInterestRate] = useState(8.5);
-  const [calcTenureYears, setCalcTenureYears] = useState(20);
-  const [calcGajInput, setCalcGajInput] = useState('50');
-
-  const dispatch = useAppDispatch();
-  const salesmanName = auth?.name || 'Authorized Salesman';
 
   const handleLogout = async () => {
     try {
@@ -134,14 +63,14 @@ export default function SalesmanDashboard() {
       /* ignore */
     }
     clearAuth();
-    navigate('/salesman/login');
+    navigate('/sales/login');
   };
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api('/api/flat-listings');
-      setListings(Array.isArray(data) ? data : []);
+      const res = await api('/api/flat-listings');
+      setListings(Array.isArray(res) ? res : []);
     } catch {
       setListings([]);
     } finally {
@@ -149,183 +78,87 @@ export default function SalesmanDashboard() {
     }
   }, []);
 
-  const cleanAllInventory = async () => {
-    const confirmClean = window.confirm(
-      'Are you sure you want to clean/delete ALL your property listings? This will completely empty the inventory.'
-    );
-    if (!confirmClean) return;
-    try {
-      setLoading(true);
-      await api('/api/flat-listings/clean/all', { method: 'DELETE' });
-      setListings([]);
-      setStatus('✓ Inventory cleaned successfully.');
-    } catch (err) {
-      alert(err.message || 'Failed to clean inventory.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     load();
   }, [load]);
 
-  // Auto-dismiss status toaster after 3 seconds
-  useEffect(() => {
-    if (!status) return;
-    const timer = setTimeout(() => {
-      setStatus('');
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [status]);
+  // Overall KPI Metrics
+  const stats = useMemo(() => {
+    const total = listings.length;
+    const available = listings.filter((l) => l.dealStatus === 'available' || !l.dealStatus).length;
+    const buyCount = listings.filter((l) => l.listingType === 'buy').length;
+    const rentCount = listings.filter((l) => l.listingType === 'rent').length;
+    const soldOrRented = listings.filter((l) => l.dealStatus === 'sold' || l.dealStatus === 'rented').length;
+    const availableBuy = listings.filter((l) => l.listingType === 'buy' && (l.dealStatus === 'available' || !l.dealStatus)).length;
+    const availableRent = listings.filter((l) => l.listingType === 'rent' && (l.dealStatus === 'available' || !l.dealStatus)).length;
 
-  const navItems = [
-    { id: 'overview', label: 'Overview', icon: 'ri-dashboard-3-line', activeIcon: 'ri-dashboard-3-fill' },
-    { id: 'add', label: 'Add Property', icon: 'ri-add-circle-line', activeIcon: 'ri-add-circle-fill' },
-    { id: 'list', label: 'My Listings', icon: 'ri-building-line', activeIcon: 'ri-building-fill' },
-    { id: 'leads', label: 'Client Leads', icon: 'ri-user-star-line', activeIcon: 'ri-user-star-fill' },
-  ];
+    const totalVolume = listings.reduce((sum, l) => {
+      const price = l.listingType === 'rent' ? Number(l.monthlyRent) || 0 : Number(l.salePrice) || 0;
+      return sum + price;
+    }, 0);
 
+    return { total, available, buyCount, rentCount, soldOrRented, availableBuy, availableRent, totalVolume };
+  }, [listings]);
+
+  // Filtered & Paginated Listings
   const filteredListings = useMemo(() => {
-    let result = listings.filter((item) => {
-      if (filterCategory !== 'all') {
-        const cat = item.propertyCategory || '';
-        const cfg = String(item.configuration || '').toLowerCase();
-        if (filterCategory === 'Commercial') {
-          if (cat !== 'Commercial' && cat !== 'Office' && cat !== 'Shop' && !cfg.includes('office') && !cfg.includes('shop')) return false;
-        } else if (filterCategory === 'Office') {
-          if (cat !== 'Office' && !cfg.includes('office')) return false;
-        } else if (filterCategory === 'Shop') {
-          if (cat !== 'Shop' && !cfg.includes('shop')) return false;
-        } else if (filterCategory === 'Flat') {
-          if (cat === 'Commercial' || cat === 'Office' || cat === 'Shop' || cat === 'Plot' || cat === 'Land' || cfg.includes('shop') || cfg.includes('office') || cfg.includes('plot')) return false;
-        } else if (filterCategory === 'Plot') {
-          if (cat !== 'Plot' && cat !== 'Land' && !cfg.includes('plot') && !cfg.includes('land')) return false;
-        } else if (cat !== filterCategory) {
-          return false;
-        }
-      }
+    return listings.filter((item) => {
       if (filterType !== 'all' && item.listingType !== filterType) return false;
 
-      // Price Filter
+      if (filterCategory !== 'all') {
+        const cat = item.propertyCategory || 'Flat';
+        if (filterCategory === 'Flat' && !['Flat', 'HK', 'RK'].includes(cat) && cat === 'Commercial') return false;
+        if (filterCategory === 'Commercial' && !['Commercial', 'Office', 'Shop'].includes(cat) && !item.commercialSubType) return false;
+        if (filterCategory === 'Office' && item.commercialSubType !== 'Office' && cat !== 'Office') return false;
+        if (filterCategory === 'Shop' && item.commercialSubType !== 'Shop' && cat !== 'Shop') return false;
+        if (filterCategory === 'Plot' && cat !== 'Plot' && cat !== 'Land') return false;
+      }
+
       if (filterPrice !== 'all') {
-        const p = item.listingType === 'rent' ? Number(item.monthlyRent) || 0 : Number(item.salePrice) || 0;
+        const price = item.listingType === 'rent' ? Number(item.monthlyRent) || 0 : Number(item.salePrice) || 0;
         if (item.listingType === 'rent') {
-          if (filterPrice === 'u15' && p > 10000) return false;
-          if (filterPrice === '15-25' && (p < 10000 || p > 20000)) return false;
-          if (filterPrice === '25-40' && (p < 20000 || p > 35000)) return false;
-          if (filterPrice === '40-60' && (p < 35000 || p > 50000)) return false;
-          if (filterPrice === 'a60' && p < 50000) return false;
+          if (filterPrice === 'u15' && price >= 10000) return false;
+          if (filterPrice === '15-25' && (price < 10000 || price > 20000)) return false;
+          if (filterPrice === '25-40' && (price < 20000 || price > 35000)) return false;
+          if (filterPrice === '40-60' && (price < 35000 || price > 50000)) return false;
+          if (filterPrice === 'a60' && price <= 50000) return false;
         } else {
-          if (filterPrice === 'u15' && p >= 1500000) return false;
-          if (filterPrice === '15-25' && (p < 1500000 || p > 2500000)) return false;
-          if (filterPrice === '25-40' && (p < 2500000 || p > 4000000)) return false;
-          if (filterPrice === '40-60' && (p < 4000000 || p > 6000000)) return false;
-          if (filterPrice === 'a60' && p <= 6000000) return false;
+          if (filterPrice === 'u15' && price >= 1500000) return false;
+          if (filterPrice === '15-25' && (price < 1500000 || price > 2500000)) return false;
+          if (filterPrice === '25-40' && (price < 2500000 || price > 4000000)) return false;
+          if (filterPrice === '40-60' && (price < 4000000 || price > 6000000)) return false;
+          if (filterPrice === 'a60' && price <= 6000000) return false;
         }
       }
 
       if (searchVal.trim()) {
         const q = searchVal.toLowerCase();
-        const matches =
-          String(item.location || '').toLowerCase().includes(q) ||
-          String(item.configuration || '').toLowerCase().includes(q) ||
-          String(item.title || '').toLowerCase().includes(q) ||
-          String(item.ownerName || '').toLowerCase().includes(q) ||
-          String(item.ownerContact || '').includes(q) ||
-          String(item.floor || '').toLowerCase().includes(q) ||
-          String(item.sizeSqft || '').toLowerCase().includes(q);
-        if (!matches) return false;
+        const text = `${item.title} ${item.location} ${item.configuration} ${item.ownerName} ${item.floor} ${item.commercialSubType}`.toLowerCase();
+        if (!text.includes(q)) return false;
       }
+
       return true;
     });
+  }, [listings, filterType, filterCategory, filterPrice, searchVal]);
 
-    if (priceSort === 'asc') {
-      result.sort((a, b) => {
-        const pa = a.listingType === 'rent' ? Number(a.monthlyRent) || 0 : Number(a.salePrice) || 0;
-        const pb = b.listingType === 'rent' ? Number(b.monthlyRent) || 0 : Number(b.salePrice) || 0;
-        return pa - pb;
-      });
-    } else if (priceSort === 'desc') {
-      result.sort((a, b) => {
-        const pa = a.listingType === 'rent' ? Number(a.monthlyRent) || 0 : Number(a.salePrice) || 0;
-        const pb = b.listingType === 'rent' ? Number(b.monthlyRent) || 0 : Number(b.salePrice) || 0;
-        return pb - pa;
-      });
-    }
-
-    return result;
-  }, [listings, filterCategory, filterType, filterPrice, priceSort, searchVal]);
-
-  const stats = useMemo(() => {
-    const total = listings.length;
-    const available = listings.filter((l) => l.dealStatus === 'available' || !l.dealStatus).length;
-    const soldOrRented = listings.filter((l) => l.dealStatus === 'sold' || l.dealStatus === 'rented').length;
-    const buyCount = listings.filter((l) => l.listingType === 'buy' || !l.listingType).length;
-    const rentCount = listings.filter((l) => l.listingType === 'rent').length;
-    const availableBuy = listings.filter((l) => (l.listingType === 'buy' || !l.listingType) && (l.dealStatus === 'available' || !l.dealStatus)).length;
-    const availableRent = listings.filter((l) => l.listingType === 'rent' && (l.dealStatus === 'available' || !l.dealStatus)).length;
-    return { total, available, soldOrRented, buyCount, rentCount, availableBuy, availableRent };
-  }, [listings]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredListings.length / PAGE_SIZE));
-  const pageData = useMemo(() => {
+  const totalPages = Math.ceil(filteredListings.length / PAGE_SIZE) || 1;
+  const paginatedListings = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredListings.slice(start, start + PAGE_SIZE);
   }, [filteredListings, currentPage]);
 
-  const handleAmenityToggle = (amenity) => {
-    const current = form.amenities ? form.amenities.split(',').map((a) => a.trim()).filter(Boolean) : [];
-    const exists = current.includes(amenity);
-    const updated = exists ? current.filter((a) => a !== amenity) : [...current, amenity];
-    setForm((prev) => ({ ...prev, amenities: updated.join(', ') }));
-  };
-
-  const handleCoverUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const b64 = await fileToBase64(file);
-      setForm((prev) => ({ ...prev, coverImage: b64 }));
-      setStatus('✓ Cover photo uploaded successfully.');
-    } catch {
-      setStatus('Failed to upload cover image file.');
-    }
-  };
-
-  const handleGalleryUpload = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    try {
-      const b64List = await Promise.all(files.map(fileToBase64));
-      setForm((prev) => ({
-        ...prev,
-        images: [...(Array.isArray(prev.images) ? prev.images : []), ...b64List],
-      }));
-      setStatus(`✓ Added ${files.length} gallery photo(s).`);
-    } catch {
-      setStatus('Failed to upload gallery images.');
-    }
-  };
-
-  const handleRemoveGalleryImage = (index) => {
-    setForm((prev) => ({
-      ...prev,
-      images: (Array.isArray(prev.images) ? prev.images : []).filter((_, i) => i !== index),
-    }));
-  };
-
+  // Actions
   const handleSaveListing = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setStatus('');
     try {
       const payload = {
         ...form,
-        title: form.title?.trim() || `${form.configuration || '2 BHK'} at ${form.location || ''}`.trim(),
-        description: form.description?.trim() || `${form.configuration || '2 BHK'} property at ${form.location || ''}`.trim(),
-        salePrice: Number(form.salePrice) || 0,
-        monthlyRent: Number(form.monthlyRent) || 0,
-        netProfit: Number(form.netProfit) || 0,
+        salePrice: form.salePrice ? Number(form.salePrice) : undefined,
+        monthlyRent: form.monthlyRent ? Number(form.monthlyRent) : undefined,
+        netProfit: form.netProfit ? Number(form.netProfit) : undefined,
+        isVerified: true,
       };
 
       if (editingId) {
@@ -334,15 +167,16 @@ export default function SalesmanDashboard() {
           body: JSON.stringify(payload),
           headers: { 'Content-Type': 'application/json' },
         });
-        setStatus('✓ Property listing updated successfully!');
+        setStatus('✓ Property updated successfully!');
       } else {
         await api('/api/flat-listings', {
           method: 'POST',
           body: JSON.stringify(payload),
           headers: { 'Content-Type': 'application/json' },
         });
-        setStatus('✓ New flat listing published successfully!');
+        setStatus('✓ New property listing published successfully!');
       }
+
       await load();
       setForm(emptyFlatListing());
       setEditingId(null);
@@ -357,53 +191,7 @@ export default function SalesmanDashboard() {
   const startEdit = (listing) => {
     setForm({ ...listing });
     setEditingId(listing._id);
-    const stdFloors = [
-      'Ground Floor (Front Side) [G-FS]',
-      'Ground Floor (Back Side) [G-BS]',
-      'Upper Ground (Front Side) [UG-FS]',
-      '1st Floor (Front Side) [1ST-FS]',
-      '2nd Floor (Back Side) [2ND-BS]',
-      '3rd Floor (Front Side) [3RD-FS]',
-      'Top Floor with Roof Rights [T-BS]',
-      'Basement Floor [BSMT]',
-      'Duplex Floor',
-      'Independent House / Villa',
-      'Ground Floor (Main Road Front)',
-      'Ground Floor (Inside Market / Plaza)',
-      'Upper Ground (Commercial)',
-      '1st Floor (Commercial Front)',
-      '2nd Floor (Office Suite)',
-      '3rd Floor / Corporate Tower',
-      'Basement (Commercial / Storage)',
-      'Full Standalone Commercial Building',
-    ];
-    setIsCustomFloor(!!listing.floor && !stdFloors.includes(listing.floor));
     setView('add');
-  };
-
-  const handleSharePortfolioWhatsApp = () => {
-    const availableItems = listings.filter((l) => l.dealStatus === 'available' || !l.dealStatus);
-    const topPicks = availableItems.slice(0, 5).map((l, i) =>
-      `${i + 1}️⃣ *${l.configuration || 'Flat'}* - ${l.location || 'Delhi NCR'}\n   💰 Demand: ${priceLabel(l)} | 🏢 ${l.floor || 'Standard'}`
-    ).join('\n\n');
-
-    const msg =
-`🏢 *BABA BROKER - VERIFIED PROPERTY PORTFOLIO*
-👤 *Executive:* ${salesmanName}
-
-📊 *Inventory Overview:*
-• Total Portfolio Value: *${formatINR(stats.totalVolume)}*
-• Active Available Properties: *${stats.available}* / ${stats.total}
-
-✨ *Top Featured Listings:*
-${topPicks || '• Contact for latest available units'}
-
-📲 *For Site Visits & Direct Inquiries:*
-Contact *${salesmanName}* | Baba Broker Real Estate
-📍 Rama Park Road, Mohan Garden, Uttam Nagar, New Delhi`;
-
-    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
   };
 
   const deleteListing = async (id) => {
@@ -417,344 +205,141 @@ Contact *${salesmanName}* | Baba Broker Real Estate
     }
   };
 
-  const changeDealStatus = async (id, newStatus) => {
+  const toggleDealStatus = async (item) => {
+    const isClosed = item.dealStatus === 'sold' || item.dealStatus === 'rented';
+    const newStatus = isClosed ? 'available' : item.listingType === 'rent' ? 'rented' : 'sold';
     try {
-      await api(`/api/flat-listings/${id}`, {
+      await api(`/api/flat-listings/${item._id}`, {
         method: 'PATCH',
         body: JSON.stringify({ dealStatus: newStatus }),
         headers: { 'Content-Type': 'application/json' },
       });
       setListings((prev) =>
-        prev.map((l) => (l._id === id ? { ...l, dealStatus: newStatus } : l))
+        prev.map((l) => (l._id === item._id ? { ...l, dealStatus: newStatus } : l))
       );
-      setStatus(`✓ Listing marked as ${newStatus}.`);
+      setStatus(`✓ Deal status changed to ${newStatus}.`);
     } catch (err) {
       setStatus(err.message || 'Failed to update deal status.');
     }
   };
 
-  const buildPitchText = (listing, client = '') => {
-    const greeting = client.trim() ? `Hi ${client.trim()},\n\n` : `Hello,\n\n`;
-    const priceText = priceLabel(listing);
-    const liftText = listing.lift === 'YES' ? '🛗 Lift Available' : 'No Lift';
-    const parkText = listing.parking && listing.parking !== 'No Parking' ? `🚗 ${listing.parking}` : 'No Dedicated Parking';
-    const videoSnippet = listing.videoUrl?.trim()
-      ? `🎥 *Video Walkthrough (YouTube / Video Tour)*:\n${listing.videoUrl.trim()}\n\n`
-      : '';
+  const handleSharePortfolio = () => {
+    const availableItems = listings.filter((l) => l.dealStatus === 'available' || !l.dealStatus);
+    const topPicks = availableItems.slice(0, 5).map((l, i) =>
+      `${i + 1}️⃣ *${l.configuration || 'Property'}* - ${l.location || 'Delhi NCR'}\n   💰 Demand: ${priceLabel(l)} | 🏢 ${l.floor || 'Standard'}`
+    ).join('\n\n');
 
-    return (
-      `${greeting}🏠 *Quick Property Alert from Baba Broker*\n\n` +
-      `*${listing.title || listing.configuration}* at *${listing.location}*\n` +
-      `💰 *Price*: ${priceText}\n` +
-      `📐 *Size*: ${listing.sizeSqft || '50 Gaj'}\n` +
-      `🏢 *Floor & Lift*: ${listing.floor || 'Standard'} | ${liftText}\n` +
-      `🚗 *Parking*: ${parkText}\n\n` +
-      videoSnippet +
-      `Let me know if you would like to visit today!\n` +
-      `- *${salesmanName}*, Baba Broker`
-    );
+    const msg =
+`🏢 *BABA BROKER - VERIFIED PROPERTY PORTFOLIO*
+👤 *Executive:* ${salesmanName}
+
+📊 *Inventory Overview:*
+• Total Portfolio Value: *${formatINR(stats.totalVolume)}*
+• Active Available Units: *${stats.available}* / ${stats.total}
+
+✨ *Top Featured Listings:*
+${topPicks || '• Contact for latest available units'}
+
+📲 *For Site Visits & Direct Inquiries:*
+Contact *${salesmanName}* | Baba Broker Real Estate
+📍 Rama Park Road, Mohan Garden, Uttam Nagar, New Delhi`;
+
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  // Calculations for Commission & EMI Tab
-  const calculatedCommission = useMemo(() => {
-    const p = Number(calcPrice) || 0;
-    const gross = (p * calcBrokeragePct) / 100;
-    const gst = gross * 0.18;
-    const net = gross - gst;
-    const agentPayout = net * 0.40;
-    return { gross, gst, net, agentPayout };
-  }, [calcPrice, calcBrokeragePct]);
-
-  const calculatedEMI = useMemo(() => {
-    const p = Number(calcLoanAmount) || 0;
-    const r = (calcInterestRate / 12) / 100;
-    const n = calcTenureYears * 12;
-    if (p <= 0 || r <= 0 || n <= 0) return { emi: 0, totalPayment: 0, totalInterest: 0 };
-    const emi = (p * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-    const totalPayment = emi * n;
-    const totalInterest = totalPayment - p;
-    return { emi: Math.round(emi), totalPayment: Math.round(totalPayment), totalInterest: Math.round(totalInterest) };
-  }, [calcLoanAmount, calcInterestRate, calcTenureYears]);
-
-  const gajConversion = useMemo(() => {
-    const g = Number(calcGajInput) || 0;
-    const sqft = g * 9;
-    const sqyd = g;
-    const sqm = (sqft * 0.092903).toFixed(2);
-    return { sqft, sqyd, sqm };
-  }, [calcGajInput]);
+  const navItems = [
+    { id: 'overview', label: 'Overview', icon: 'ri-dashboard-3-line' },
+    { id: 'list', label: 'Property Catalog', icon: 'ri-building-line', badge: stats.total },
+    { id: 'add', label: editingId ? 'Edit Property' : 'Onboard Property', icon: 'ri-add-circle-line' },
+    { id: 'leads', label: 'Client Inquiries', icon: 'ri-user-star-line' },
+    { id: 'calculator', label: 'Deal Calculators', icon: 'ri-calculator-line' },
+  ];
 
   return (
-    <div className="h-screen w-screen bg-[#070e1c] p-1.5 sm:p-3 font-['Inter',sans-serif] text-slate-800 antialiased flex flex-col justify-center overflow-hidden select-text">
-      
-      {/* Toast Alert */}
-      {status && (
-        <div className="fixed top-5 right-5 z-50 flex items-center gap-2.5 rounded-2xl border border-emerald-200 bg-white text-emerald-800 shadow-xl px-4 py-3 text-xs font-bold animate-in fade-in slide-in-from-top-2">
-          <i className="ri-checkbox-circle-fill text-emerald-600 text-base" />
-          <span>{status}</span>
-          <button type="button" onClick={() => setStatus('')} className="text-slate-400 hover:text-slate-600 ml-2">
-            <i className="ri-close-line text-sm" />
-          </button>
-        </div>
-      )}
+    <div className="flex flex-col h-screen w-screen bg-slate-100 font-['Inter',sans-serif] text-slate-800 antialiased overflow-hidden select-none">
+      {/* 1. Reusable Top Navigation */}
+      <DashboardTopNav
+        roleTitle="Sales Executive Desk"
+        roleBadge="Sales Associate"
+        userName={salesmanName}
+        dutyStatus={dutyStatus}
+        onToggleDuty={() => setDutyStatus((d) => (d === 'online' ? 'offline' : 'online'))}
+        onLogout={handleLogout}
+        onToggleMobileSidebar={() => setMobileSidebarOpen((o) => !o)}
+      />
 
-      {/* Main Curved App Container */}
-      <div className="w-full h-full rounded-2xl sm:rounded-[32px] md:rounded-[36px] shadow-2xl shadow-slate-950/80 overflow-hidden bg-white flex flex-col lg:flex-row border border-slate-800/30 relative">
+      {/* 2. Main Workspace Layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Reusable Sidebar */}
+        <DashboardSidebar
+          view={view}
+          setView={setView}
+          navItems={navItems}
+          onSharePortfolio={handleSharePortfolio}
+          mobileSidebarOpen={mobileSidebarOpen}
+          setMobileSidebarOpen={setMobileSidebarOpen}
+        />
 
-        {/* Mobile Backdrop */}
-        {mobileSidebarOpen && (
-          <div
-            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 lg:hidden"
-            onClick={() => setMobileSidebarOpen(false)}
-            aria-hidden="true"
-          />
-        )}
-
-        {/* ─── LEFT SOLID ORANGE SIDEBAR ─── */}
-        <aside
-          className={`fixed lg:static top-0 left-0 h-full w-64 sm:w-72 lg:w-52 bg-[#ea580c] text-white flex flex-col justify-between pl-3.5 py-4 pr-0 select-none shrink-0 overflow-y-auto z-50 lg:z-20 shadow-2xl transition-transform duration-300 ${
-            mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-          }`}
-        >
-          <div className="space-y-4">
-            {/* Logo & Mobile Close */}
-            <div className="pr-3.5 flex items-center justify-between">
-              <Link to="/" onClick={() => setMobileSidebarOpen(false)} className="flex items-center px-1 group">
-                <img
-                  src="/assets/img/logo.svg"
-                  alt="Baba Broker"
-                  className="h-8 w-auto max-w-[155px] object-contain brightness-0 invert transition-transform group-hover:scale-105"
-                />
-              </Link>
-              <button
-                type="button"
-                onClick={() => setMobileSidebarOpen(false)}
-                className="lg:hidden h-8 w-8 rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center cursor-pointer"
-                title="Close Menu"
-              >
-                <i className="ri-close-line text-lg" />
-              </button>
-            </div>
-
-            {/* Navigation Tabs */}
-            <nav className="space-y-1.5 pt-2 pr-0">
-              {navItems.map((item) => {
-                const isActive = view === item.id;
-
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setView(item.id);
-                      setMobileSidebarOpen(false);
-                    }}
-                    className={`w-full group relative flex items-center justify-between text-xs cursor-pointer text-left transition-all duration-200 ${
-                      isActive
-                        ? 'bg-white text-[#ea580c] font-black pl-3 py-2.5 pr-4 rounded-l-2xl rounded-r-none shadow-[-6px_4px_16px_rgba(0,0,0,0.12)] z-10 -mr-[1px]'
-                        : 'text-white/90 hover:text-white hover:bg-white/20 px-3 py-2.5 rounded-xl mr-3.5 font-bold'
-                    }`}
-                  >
-                    {isActive && (
-                      <>
-                        <svg className="hidden sm:block absolute -top-3 right-0 w-3 h-3 pointer-events-none fill-white" viewBox="0 0 16 16">
-                          <path d="M0,16 Q16,16 16,0 L16,16 Z" />
-                        </svg>
-                        <svg className="hidden sm:block absolute -bottom-3 right-0 w-3 h-3 pointer-events-none fill-white" viewBox="0 0 16 16">
-                          <path d="M0,0 Q16,0 16,16 L16,0 Z" />
-                        </svg>
-                      </>
-                    )}
-
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      {isActive ? (
-                        <div className="h-6 w-6 rounded-lg bg-orange-600 text-white flex items-center justify-center text-xs shadow-xs shrink-0">
-                          <i className={item.activeIcon} />
-                        </div>
-                      ) : (
-                        <i className={`${item.icon} text-base shrink-0 text-white/90`} />
-                      )}
-                      <span className="truncate">{item.label}</span>
-                    </div>
-
-                    {item.id === 'list' && (
-                      <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${isActive ? 'bg-orange-100 text-orange-700' : 'bg-white/20 text-white'}`}>
-                        {stats.total}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Clean Sidebar Footer */}
-          <div className="pt-3 pr-3.5 mt-auto border-t border-white/20 text-center select-none">
-            <p className="text-[10px] text-white/85 font-semibold">Baba Broker Sales Desk</p>
-            <p className="text-[9px] text-white/70">v2.4 · Executive Edition</p>
-          </div>
-        </aside>
-
-        {/* ─── RIGHT CANVAS: FULL WIDTH WORKSPACE ─── */}
-        <div className="flex-1 h-full flex flex-col min-w-0 overflow-hidden bg-white">
-          
-          {/* Header */}
-          <header className="px-3.5 sm:px-6 py-2.5 sm:py-3 border-b border-slate-200/90 flex items-center justify-between gap-3 bg-white sticky top-0 z-30 shadow-xs font-['Inter',sans-serif]">
-            <div className="flex items-center gap-2.5 flex-1 max-w-md">
-              <button
-                type="button"
-                onClick={() => setMobileSidebarOpen((prev) => !prev)}
-                className="lg:hidden h-9 w-9 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 flex items-center justify-center cursor-pointer shrink-0 transition-all shadow-2xs"
-                title="Toggle Menu"
-              >
-                <i className="ri-menu-2-line text-lg font-bold" />
-              </button>
-
-              <div className="relative w-full">
-                <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
-                <input
-                  type="text"
-                  value={searchVal}
-                  onChange={(e) => setSearchVal(e.target.value)}
-                  placeholder="Quick search location, phone, size..."
-                  className="w-full rounded-xl bg-slate-50 hover:bg-slate-100/80 focus:bg-white pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none border border-slate-200/90 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10 transition font-medium shadow-2xs"
-                />
-                {searchVal && (
-                  <button type="button" onClick={() => setSearchVal('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    <i className="ri-close-line text-xs" />
-                  </button>
-                )}
+        {/* Dynamic Canvas */}
+        <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
+          <main className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3.5">
+            {/* Notification Banner */}
+            {status && (
+              <div className="rounded-xl border border-orange-200 bg-orange-50 px-3.5 py-2 text-xs font-bold text-orange-900 flex items-center justify-between shadow-2xs">
+                <span className="flex items-center gap-1.5">
+                  <i className="ri-information-line text-orange-600 text-sm" /> {status}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setStatus('')}
+                  className="text-orange-400 hover:text-orange-900 cursor-pointer text-sm"
+                >
+                  ✕
+                </button>
               </div>
-            </div>
+            )}
 
-            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-              {/* Luxury Executive Profile Pill */}
-              <div className="flex items-center gap-2.5 bg-gradient-to-r from-slate-50 via-white to-orange-50/30 pl-1.5 pr-3 py-1 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-orange-200 transition group">
-                <div className="relative">
-                  <div className="h-8 w-8 sm:h-8.5 sm:w-8.5 rounded-xl bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-500 text-white font-black text-xs flex items-center justify-center shadow-xs ring-2 ring-orange-400/20 group-hover:scale-105 transition-transform">
-                    {salesmanName.slice(0, 2).toUpperCase()}
-                  </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Executive" />
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-black text-slate-900 leading-tight group-hover:text-orange-950 transition-colors">
-                      {salesmanName}
-                    </span>
-                    <i className="ri-verified-badge-fill text-orange-600 text-[11px]" title="Verified Sales Partner" />
-                  </div>
-                  <span className="text-[9.5px] text-slate-400 font-bold block leading-none mt-0.5">
-                    Field Associate • Sales Desk
-                  </span>
-                </div>
-              </div>
-
-              {/* Logout Button */}
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-red-50 border border-slate-200/90 hover:border-red-200 text-slate-600 hover:text-red-600 text-xs font-bold transition-all shadow-2xs cursor-pointer group active:scale-95"
-                title="Sign Out"
-              >
-                <i className="ri-logout-box-r-line text-sm text-slate-400 group-hover:text-red-500 transition-colors" />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
-            </div>
-          </header>
-
-          {/* Main Content Workspace (Full Width Container) */}
-          <main className="flex-1 overflow-y-auto p-3 sm:p-5 bg-slate-50/60 space-y-3">
-
-            {/* ─── TAB 0: EXECUTIVE OVERVIEW PAGE ─── */}
+            {/* ─── TAB 0: OVERVIEW ─── */}
             {view === 'overview' && (
               <div className="space-y-3 w-full">
-                
-                {/* 1. Compact Personalized Welcome Banner */}
-                <div className="rounded-2xl bg-white text-slate-800 p-3 sm:p-3.5 shadow-2xs border border-slate-200/90 relative overflow-hidden w-full">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 relative z-10">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h1 className="text-sm sm:text-base font-black tracking-tight text-slate-900">
-                            Welcome back, <span className="text-orange-600">{salesmanName}</span> 👋
-                          </h1>
-                          <span className="px-2 py-0.2 rounded-full bg-orange-50 text-orange-700 text-[9.5px] font-black uppercase tracking-wider border border-orange-200 shrink-0">
-                            Sales Desk Active
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                          Manage your property inventory, client WhatsApp pitches, and deal conversions.
-                        </p>
-                      </div>
+                {/* Executive Welcome Banner */}
+                <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-sm sm:text-base font-black tracking-tight text-slate-900">
+                        Welcome back, <span className="text-orange-600">{salesmanName}</span> 👋
+                      </h1>
+                      <span className="px-2 py-0.2 rounded-full bg-orange-50 text-orange-700 text-[9.5px] font-black uppercase tracking-wider border border-orange-200 shrink-0">
+                        Sales Desk
+                      </span>
                     </div>
+                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                      Pitch active properties, schedule customer visits, and calculate brokerage commissions.
+                    </p>
+                  </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => { setForm(emptyFlatListing()); setEditingId(null); setView('add'); }}
-                        className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <i className="ri-add-line text-sm" /> Add Property
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setView('leads')}
-                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition border border-slate-200 flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <i className="ri-user-star-line text-sm text-amber-600" /> Client Leads
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-2 flex-wrap shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => { setForm(emptyFlatListing()); setEditingId(null); setView('add'); }}
+                      className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <i className="ri-add-line text-sm" /> Add Property
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSharePortfolio}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <i className="ri-whatsapp-fill text-sm" /> Share Portfolio
+                    </button>
                   </div>
                 </div>
 
-                {/* 2. Compact Key Metrics Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 w-full">
-                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-2xs">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">Total Inventory</span>
-                      <div className="h-5.5 w-5.5 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center text-xs">
-                        <i className="ri-building-line" />
-                      </div>
-                    </div>
-                    <div className="text-sm sm:text-base font-black text-slate-900">{stats.total} Units</div>
-                    <span className="text-[9.5px] text-slate-400 font-medium">{stats.available} Available for Pitch</span>
-                  </div>
+                {/* 4-Card Metrics Grid */}
+                <DashboardMetricsGrid stats={stats} />
 
-                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-2xs">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">Buy Deals</span>
-                      <div className="h-5.5 w-5.5 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
-                        <i className="ri-price-tag-3-line" />
-                      </div>
-                    </div>
-                    <div className="text-sm sm:text-base font-black text-blue-700">{stats.buyCount} Properties</div>
-                    <span className="text-[9.5px] text-blue-600 font-bold">{stats.availableBuy} Active for Sale</span>
-                  </div>
-
-                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-2xs">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">Rental Units</span>
-                      <div className="h-5.5 w-5.5 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
-                        <i className="ri-key-2-line" />
-                      </div>
-                    </div>
-                    <div className="text-sm sm:text-base font-black text-emerald-700">{stats.rentCount} Rentals</div>
-                    <span className="text-[9.5px] text-emerald-600 font-bold">{stats.availableRent} Active for Rent</span>
-                  </div>
-
-                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-2xs">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">Deals Closed</span>
-                      <div className="h-5.5 w-5.5 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-xs">
-                        <i className="ri-checkbox-circle-line" />
-                      </div>
-                    </div>
-                    <div className="text-sm sm:text-base font-black text-purple-700">{stats.soldOrRented} Converted</div>
-                    <span className="text-[9.5px] text-purple-600 font-bold">Sold &amp; Rented properties</span>
-                  </div>
-                </div>
-
-                {/* 3. Recent Inventory Live Table */}
+                {/* Recent Inventory Table */}
                 <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-xs space-y-2.5 w-full">
                   <PageHeader
                     icon="ri-time-line"
@@ -773,111 +358,20 @@ Contact *${salesmanName}* | Baba Broker Real Estate
                     }
                   />
 
-                  <div className="rounded-xl border border-slate-200 overflow-hidden">
-                    <table className="w-full text-left text-xs border-collapse select-none">
-                      <thead className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b-2 border-orange-500 text-[10.5px] font-black uppercase tracking-wider text-amber-300">
-                        <tr>
-                          <th className="py-2.5 px-3 text-white border-r border-slate-700/60">Property</th>
-                          <th className="py-2.5 px-3 text-white border-r border-slate-700/60">Location</th>
-                          <th className="py-2.5 px-3 text-white border-r border-slate-700/60">Floor</th>
-                          <th className="py-2.5 px-3 text-white border-r border-slate-700/60">Price</th>
-                          <th className="py-2.5 px-3 text-white border-r border-slate-700/60">Associate</th>
-                          <th className="py-2.5 px-3 text-right text-white">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 bg-white font-medium text-slate-700">
-                        {listings.slice(0, 8).map((item) => {
-                          const isSold = item.dealStatus === 'sold';
-                          const isRented = item.dealStatus === 'rented';
-                          const isClosed = isSold || isRented;
-
-                          return (
-                            <tr
-                              key={item._id}
-                              className={`border-b border-slate-200/90 transition-all duration-150 select-none ${
-                                isClosed ? 'opacity-35 bg-slate-100/70 pointer-events-none' : 'hover:bg-amber-50/40'
-                              }`}
-                            >
-                              <td className="py-2 px-3 border-r border-slate-200/80">
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                    className="h-8 w-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center font-black text-[11px] shrink-0 overflow-hidden border border-slate-200 shadow-2xs cursor-pointer hover:opacity-90 transition"
-                                    title="Click to view photo"
-                                  >
-                                    {item.coverImage ? (
-                                      <img src={item.coverImage} alt="" className="h-full w-full object-cover" />
-                                    ) : (item.images && item.images.length > 0) ? (
-                                      <img src={item.images[0]} alt="" className="h-full w-full object-cover" />
-                                    ) : (
-                                      <span className="text-[9px] font-black text-orange-600">{(item.configuration || '2B').slice(0, 2)}</span>
-                                    )}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="px-1.5 py-0.2 rounded bg-orange-100 text-orange-800 text-[9px] font-black uppercase">
-                                        {item.configuration || '2 BHK'}
-                                      </span>
-                                      <span
-                                        onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                        className="font-bold text-slate-900 truncate hover:text-orange-600 cursor-pointer text-xs"
-                                      >
-                                        {item.sizeSqft || 'Builder Floor'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-2 px-3 text-slate-700 font-medium border-r border-slate-200/80 truncate max-w-[180px]">
-                                {item.location}
-                              </td>
-                              <td className="py-2 px-3 text-[10.5px] text-slate-600 border-r border-slate-200/80 whitespace-nowrap">
-                                {item.floor || 'Standard'}
-                              </td>
-                              <td className="py-2 px-3 font-bold text-emerald-700 border-r border-slate-200/80 whitespace-nowrap">
-                                {priceLabel(item)}
-                              </td>
-                              <td className="py-2 px-3 text-slate-600 border-r border-slate-200/80 truncate max-w-[140px]">
-                                {item.ownerName || 'Associate'}
-                              </td>
-                              <td className="py-2 px-3 text-right whitespace-nowrap">
-                                <div className={`inline-flex items-center gap-1 ${isClosed ? 'pointer-events-none opacity-30 cursor-not-allowed' : ''}`}>
-                                  <button
-                                    type="button"
-                                    disabled={isClosed}
-                                    onClick={() => { setPitchingProperty(item); setPitchClientName(''); }}
-                                    className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200 cursor-pointer inline-flex items-center gap-1 disabled:cursor-not-allowed transition"
-                                    title="WhatsApp Client Pitch"
-                                  >
-                                    <i className="ri-whatsapp-line text-xs" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={isClosed}
-                                    onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                    className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 transition cursor-pointer inline-flex items-center gap-1 disabled:cursor-not-allowed"
-                                    title="View Property & Photos"
-                                  >
-                                    <i className="ri-eye-line text-xs" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                  <PropertyTable
+                    listings={listings.slice(0, 10)}
+                    onViewDetails={(item) => setViewingProperty(item)}
+                    onPitch={(item) => setPitchingProperty(item)}
+                    onEdit={startEdit}
+                    onToggleDealStatus={toggleDealStatus}
+                  />
                 </div>
-
               </div>
             )}
 
-            {/* ─── TAB 1: MY LISTINGS (FULL WIDTH COMPACT TABLE & CARDS) ─── */}
+            {/* ─── TAB 1: PROPERTY INVENTORY CATALOG ─── */}
             {view === 'list' && (
               <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-xs space-y-3 w-full">
-                
-                {/* 1. Standard Reusable Header */}
                 <PageHeader
                   icon="ri-building-line"
                   title="Property Inventory Catalog"
@@ -908,1451 +402,176 @@ Contact *${salesmanName}* | Baba Broker Real Estate
                       <button
                         type="button"
                         onClick={() => { setForm(emptyFlatListing()); setEditingId(null); setView('add'); }}
-                        className="px-2.5 py-1 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer shrink-0"
                       >
-                        <i className="ri-add-line text-sm" /> Add Property
+                        <i className="ri-add-line text-sm" />
+                        <span className="hidden sm:inline">Add Property</span>
                       </button>
                     </div>
                   }
                 />
 
-                {/* 2. Filter & View Controls */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {[
-                      { id: 'all', label: 'All Types' },
-                      { id: 'Flat', label: '🏠 Flat' },
-                      { id: 'Commercial', label: '🏢 Commercial' },
-                      { id: 'Office', label: '💼 Office' },
-                      { id: 'Shop', label: '🏪 Shop' },
-                      { id: 'Plot', label: '📐 Plot' },
-                    ].map((cat) => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => { setFilterCategory(cat.id); setCurrentPage(1); }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                          filterCategory === cat.id
-                            ? 'bg-orange-600 text-white shadow-2xs font-black'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {cat.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Budget Selector */}
-                    <div className="flex items-center gap-1">
-                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl border bg-amber-50 text-amber-950 border-amber-300 shadow-2xs">
-                        <i className="ri-money-rupee-circle-fill text-amber-600 text-xs" />
-                        <select
-                          value={filterPrice}
-                          onChange={(e) => { setFilterPrice(e.target.value); setCurrentPage(1); }}
-                          className="text-xs font-bold bg-transparent outline-none cursor-pointer pr-1"
-                        >
-                          <option value="all" className="bg-white text-slate-800">💰 All Budgets</option>
-                          <option value="u15" className="bg-white text-slate-800">&lt; ₹15 Lakh</option>
-                          <option value="15-25" className="bg-white text-slate-800">₹15 L – ₹25 L</option>
-                          <option value="25-40" className="bg-white text-slate-800">₹25 L – ₹40 L</option>
-                          <option value="40-60" className="bg-white text-slate-800">₹40 L – ₹60 L</option>
-                          <option value="a60" className="bg-white text-slate-800">&gt; ₹60 Lakh</option>
-                        </select>
-                      </div>
-                      {filterPrice !== 'all' && (
+                {/* Filter Ribbon */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 pb-2.5 border-b border-slate-100 text-xs">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Categories */}
+                    <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200/80">
+                      {[
+                        { id: 'all', label: 'All Units' },
+                        { id: 'Flat', label: '🏠 Flat' },
+                        { id: 'Commercial', label: '🏢 Commercial' },
+                        { id: 'Office', label: '💼 Office' },
+                        { id: 'Shop', label: '🏪 Shop' },
+                      ].map((cat) => (
                         <button
+                          key={cat.id}
                           type="button"
-                          onClick={() => setFilterPrice('all')}
-                          className="px-1.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black cursor-pointer"
+                          onClick={() => { setFilterCategory(cat.id); setCurrentPage(1); }}
+                          className={`px-2 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            filterCategory === cat.id
+                              ? 'bg-orange-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
                         >
-                          ✕
+                          {cat.label}
                         </button>
-                      )}
+                      ))}
                     </div>
 
-                    {/* Layout View Mode Switch */}
+                    {/* Deal Types */}
+                    <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200/80">
+                      {['all', 'buy', 'rent'].map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => { setFilterType(t); setFilterPrice('all'); setCurrentPage(1); }}
+                          className={`px-2 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
+                            filterType === t
+                              ? 'bg-slate-900 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {t === 'all' ? 'All Deals' : t === 'buy' ? '🏷️ Buy/Sale' : '🔑 Rent'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Budget Selector & View Switch */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1 bg-amber-50 border border-amber-200/80 px-2 py-1 rounded-xl">
+                      <select
+                        value={filterPrice}
+                        onChange={(e) => { setFilterPrice(e.target.value); setCurrentPage(1); }}
+                        className="text-xs font-bold text-amber-950 bg-transparent outline-none cursor-pointer"
+                      >
+                        <option value="all">💰 All Budgets</option>
+                        <option value="u15">Under ₹15 Lakh</option>
+                        <option value="15-25">₹15 L – ₹25 Lakh</option>
+                        <option value="25-40">₹25 L – ₹40 Lakh</option>
+                        <option value="40-60">₹40 L – ₹60 Lakh</option>
+                        <option value="a60">Above ₹60 Lakh</option>
+                      </select>
+                    </div>
+
                     <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200">
                       <button
                         type="button"
-                        onClick={() => setLayoutMode('table')}
-                        className={`px-2 py-0.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
-                          layoutMode === 'table' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                        onClick={() => setInventoryViewMode('table')}
+                        className={`px-2 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                          inventoryViewMode === 'table' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600'
                         }`}
-                        title="Table View"
                       >
-                        <i className="ri-table-line text-xs" /> Table
+                        <i className="ri-table-line" /> Table
                       </button>
                       <button
                         type="button"
-                        onClick={() => setLayoutMode('grid')}
-                        className={`px-2 py-0.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
-                          layoutMode === 'grid' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                        onClick={() => setInventoryViewMode('grid')}
+                        className={`px-2 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                          inventoryViewMode === 'grid' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600'
                         }`}
-                        title="Cards View"
                       >
-                        <i className="ri-grid-fill text-xs" /> Cards
+                        <i className="ri-grid-fill" /> Cards
                       </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Table View */}
-                {layoutMode === 'table' ? (
-                  <div className="rounded-xl border border-slate-200 w-full bg-white shadow-xs overflow-hidden">
-                    <table className="w-full text-left text-xs border-collapse select-none">
-                      <thead className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b-2 border-orange-500 text-[10.5px] font-black uppercase tracking-wider text-amber-300">
-                        <tr>
-                          <th className="py-2.5 px-3 text-white border-r border-slate-700/60">Property &amp; Size</th>
-                          <th className="py-2.5 px-3 text-white border-r border-slate-700/60">Location</th>
-                          <th className="py-2.5 px-3 text-white border-r border-slate-700/60">Floor</th>
-                          <th className="py-2.5 px-3 text-white border-r border-slate-700/60">Price</th>
-                          <th className="py-2.5 px-3 text-white border-r border-slate-700/60">Net</th>
-                          <th className="py-2.5 px-3 text-white border-r border-slate-700/60">Associate</th>
-                          <th className="py-2.5 px-3 text-center text-white border-r border-slate-700/60">Actions</th>
-                          <th className="py-2.5 px-3 text-right text-white">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 bg-white font-medium text-slate-700">
-                        {pageData.map((item) => {
-                          const cleanPhone = String(item.ownerContact || '').replace(/[^\d]/g, '');
-                          const isSold = item.dealStatus === 'sold';
-                          const isRented = item.dealStatus === 'rented';
-                          const isClosed = isSold || isRented;
-                          const isForRent = item.listingType === 'rent';
-
-                          return (
-                            <tr
-                              key={item._id}
-                              className={`border-b border-slate-200/90 transition-all duration-150 select-none ${
-                                isClosed ? 'bg-slate-100/70' : 'hover:bg-amber-50/40'
-                              }`}
-                            >
-                              <td className={`py-2 px-3 border-r border-slate-200/80 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                    className="h-8 w-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden border border-slate-200 shadow-2xs cursor-pointer hover:opacity-90 transition"
-                                    title="Click to view photos"
-                                  >
-                                    {item.coverImage ? (
-                                      <img src={item.coverImage} alt="" className="h-full w-full object-cover" />
-                                    ) : (item.images && item.images.length > 0) ? (
-                                      <img src={item.images[0]} alt="" className="h-full w-full object-cover" />
-                                    ) : (
-                                      <span className="text-[9px] font-black text-orange-600">{(item.configuration || '2B').slice(0, 2)}</span>
-                                    )}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-1">
-                                      <span className="px-1.5 py-0.2 rounded bg-orange-100 text-orange-800 text-[9px] font-black uppercase">
-                                        {item.configuration || '2 BHK'}
-                                      </span>
-                                      <span
-                                        onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                        className="font-bold text-slate-900 truncate hover:text-orange-600 cursor-pointer text-xs"
-                                        title={item.title}
-                                      >
-                                        {item.sizeSqft || 'Builder Floor'}
-                                      </span>
-                                      {isClosed && (
-                                        <span className="text-[8.5px] font-black px-1 py-0.2 rounded bg-red-100 text-red-700 uppercase shrink-0">
-                                          {isSold ? 'SOLD' : 'RENTED'}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-
-                              <td className={`py-2 px-3 border-r border-slate-200/80 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                                <div className="flex items-center gap-1 font-bold text-slate-800 truncate max-w-[170px]">
-                                  <i className="ri-map-pin-2-fill text-orange-500 text-xs shrink-0" />
-                                  <span className="truncate">{item.location || '—'}</span>
-                                </div>
-                              </td>
-
-                              <td className={`py-2 px-3 whitespace-nowrap border-r border-slate-200/80 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                                <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 text-[10px] font-bold">
-                                  {item.floor || 'Standard'}
-                                </span>
-                              </td>
-
-                              <td className={`py-2 px-3 whitespace-nowrap border-r border-slate-200/80 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                                <span className="font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60 text-xs">
-                                  {priceLabel(item)}
-                                </span>
-                              </td>
-
-                              <td className={`py-2 px-3 whitespace-nowrap border-r border-slate-200/80 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                                <span className={`text-[11px] font-bold ${item.netProfit > 0 ? 'text-amber-700' : 'text-slate-300'}`}>
-                                  {item.netProfit > 0 ? formatINR(item.netProfit) : '—'}
-                                </span>
-                              </td>
-
-                              <td className={`py-2 px-3 whitespace-nowrap border-r border-slate-200/80 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                                <span className="text-slate-800 font-bold block text-xs">{item.ownerName || 'Associate'}</span>
-                                {cleanPhone && <span className="text-[9.5px] text-slate-400 font-mono block leading-none">{cleanPhone}</span>}
-                              </td>
-
-                              {/* Actions Buttons (Compact Icon Pills) */}
-                              <td className={`py-2 px-2.5 text-center whitespace-nowrap border-r border-slate-200/80 ${isClosed ? 'opacity-35 pointer-events-none' : ''}`}>
-                                <div className={`inline-flex items-center gap-1 ${isClosed ? 'pointer-events-none opacity-30 cursor-not-allowed' : ''}`}>
-                                  <button
-                                    type="button"
-                                    disabled={isClosed}
-                                    onClick={() => { setPitchingProperty(item); setPitchClientName(''); }}
-                                    title="WhatsApp Client Pitch Flyer"
-                                    className="h-7 w-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold transition flex items-center justify-center border border-emerald-200 cursor-pointer disabled:cursor-not-allowed"
-                                  >
-                                    <i className="ri-whatsapp-line text-xs" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={isClosed}
-                                    onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                                    className="h-7 w-7 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold transition flex items-center justify-center border border-blue-200 cursor-pointer disabled:cursor-not-allowed"
-                                    title="View Property & Photos"
-                                  >
-                                    <i className="ri-eye-line text-xs" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={isClosed}
-                                    onClick={() => startEdit(item)}
-                                    className="h-7 w-7 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold transition flex items-center justify-center border border-orange-200 cursor-pointer disabled:cursor-not-allowed"
-                                    title="Edit"
-                                  >
-                                    <i className="ri-edit-line text-xs" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={isClosed}
-                                    onClick={() => deleteListing(item._id)}
-                                    className="h-7 w-7 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-700 font-bold transition flex items-center justify-center border border-slate-200 hover:border-red-200 cursor-pointer disabled:cursor-not-allowed"
-                                    title="Delete"
-                                  >
-                                    <i className="ri-delete-bin-line text-xs" />
-                                  </button>
-                                </div>
-                              </td>
-
-                              {/* Deal Switch Column */}
-                              <td className="py-2 px-3 text-right whitespace-nowrap pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex items-center justify-end">
-                                  <button
-                                    type="button"
-                                    onClick={() => changeDealStatus(item._id, isClosed ? 'available' : (isForRent ? 'rented' : 'sold'))}
-                                    className={`inline-flex items-center gap-1.5 px-2 py-0.8 rounded-md border transition-all duration-150 cursor-pointer shadow-2xs font-mono select-none ${
-                                      isClosed
-                                        ? 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
-                                        : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                                    }`}
-                                    title={isClosed ? 'Deal is closed. Click to unfreeze & mark as Active (Available)' : `Click to close deal & mark as ${isForRent ? 'Rented' : 'Sold'}`}
-                                  >
-                                    <div className={`relative flex items-center h-3.5 w-6 shrink-0 rounded-full px-0.5 transition-colors duration-200 ${
-                                      isClosed ? 'bg-rose-600' : 'bg-emerald-600'
-                                    }`}>
-                                      <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white shadow-xs transition-transform duration-200 ${
-                                        isClosed ? 'translate-x-0' : 'translate-x-2.5'
-                                      }`} />
-                                    </div>
-                                    <span className="text-[9px] font-black uppercase tracking-wider min-w-[38px] text-left">
-                                      {isClosed ? (isSold ? 'SOLD' : 'RENTED') : 'ACTIVE'}
-                                    </span>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                {/* List Body */}
+                {paginatedListings.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400">
+                    <i className="ri-building-line text-4xl mb-2 block text-slate-300" />
+                    <p className="text-xs font-bold text-slate-600">No properties found matching filters.</p>
                   </div>
+                ) : inventoryViewMode === 'grid' ? (
+                  <PropertyGrid
+                    listings={paginatedListings}
+                    onViewDetails={(item) => setViewingProperty(item)}
+                    onPitch={(item) => setPitchingProperty(item)}
+                    onEdit={startEdit}
+                    onDelete={deleteListing}
+                    onToggleDealStatus={toggleDealStatus}
+                  />
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 w-full">
-                    {pageData.map((item) => {
-                      const isClosed = item.dealStatus === 'sold' || item.dealStatus === 'rented';
-
-                      return (
-                        <div
-                          key={item._id}
-                          className={`rounded-2xl border border-slate-200 overflow-hidden bg-white hover:shadow-md transition space-y-2.5 p-3 ${
-                            isClosed ? 'opacity-40 hover:opacity-90 bg-slate-50/90' : ''
-                          }`}
-                        >
-                        <div className="relative h-36 w-full rounded-xl overflow-hidden bg-slate-100">
-                          {item.coverImage ? (
-                            <img src={item.coverImage} alt={item.title} className="h-full w-full object-cover" />
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center text-slate-300">
-                              <i className="ri-building-line text-4xl" />
-                            </div>
-                          )}
-                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] font-bold uppercase backdrop-blur-xs">
-                            {item.propertyCategory}
-                          </span>
-                          <span className="absolute top-2 right-2 px-2.5 py-0.5 rounded-md bg-orange-600 text-white text-[10px] font-black uppercase shadow-xs">
-                            {priceLabel(item)}
-                          </span>
-                        </div>
-
-                        <div>
-                          <h4 className="text-xs font-black text-slate-900 line-clamp-1">{item.title || item.configuration}</h4>
-                          <p className="text-[11px] text-slate-400 line-clamp-1 flex items-center gap-1 mt-0.5">
-                            <i className="ri-map-pin-line text-[#ea580c]" /> {item.location}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100 font-medium">
-                          <span>{item.sizeSqft || '450 sqft'} • {item.floor || 'Standard'}</span>
-                          <select
-                            value={item.dealStatus || 'available'}
-                            onChange={(e) => changeDealStatus(item._id, e.target.value)}
-                            className="rounded-lg border border-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase bg-white outline-none cursor-pointer text-slate-700"
-                          >
-                            <option value="available">Available</option>
-                            <option value="rented">Rented</option>
-                            <option value="sold">Sold</option>
-                          </select>
-                        </div>
-
-                        <div className="grid grid-cols-4 gap-1.5 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => { setPitchingProperty(item); setPitchClientName(''); }}
-                            className="py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center gap-1 transition border border-emerald-200 cursor-pointer"
-                          >
-                            <i className="ri-whatsapp-line text-xs" />
-                            <span>Pitch</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setViewingProperty(item); setActivePhotoIdx(0); }}
-                            className="py-1 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center gap-1 transition border border-blue-200 cursor-pointer"
-                          >
-                            <i className="ri-eye-line text-xs" />
-                            <span>View</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => startEdit(item)}
-                            className="py-1 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold text-xs flex items-center justify-center gap-1 transition border border-orange-200 cursor-pointer"
-                          >
-                            <i className="ri-edit-line text-xs" />
-                            <span>Edit</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteListing(item._id)}
-                            className="py-1 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-700 font-bold text-xs flex items-center justify-center gap-1 transition border border-slate-200 hover:border-red-200 cursor-pointer"
-                          >
-                            <i className="ri-delete-bin-line text-xs" />
-                            <span>Delete</span>
-                          </button>
-                        </div>
-                      </div>
-                      );
-                    })}
-                  </div>
+                  <PropertyTable
+                    listings={paginatedListings}
+                    currentPage={currentPage}
+                    pageSize={PAGE_SIZE}
+                    onViewDetails={(item) => setViewingProperty(item)}
+                    onPitch={(item) => setPitchingProperty(item)}
+                    onEdit={startEdit}
+                    onDelete={deleteListing}
+                    onToggleDealStatus={toggleDealStatus}
+                  />
                 )}
 
                 {/* Pagination */}
-                {filteredListings.length > 0 && (
-                  <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs text-slate-500">
-                    <span>
-                      Showing {(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, filteredListings.length)} of {filteredListings.length}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                    <span className="text-slate-400 font-medium">
+                      Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredListings.length)} of {filteredListings.length} units
                     </span>
-                    {totalPages > 1 && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          disabled={currentPage <= 1}
-                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                          className="px-2 py-0.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 font-bold"
-                        >
-                          Prev
-                        </button>
-                        <span className="px-1.5 font-bold text-slate-800">{currentPage} / {totalPages}</span>
-                        <button
-                          type="button"
-                          disabled={currentPage >= totalPages}
-                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                          className="px-2 py-0.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 font-bold"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={currentPage <= 1}
+                        onClick={() => setCurrentPage((p) => p - 1)}
+                        className="px-2.5 py-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold disabled:opacity-40 cursor-pointer shadow-2xs"
+                      >
+                        Prev
+                      </button>
+                      <span className="px-2 py-0.5 rounded-lg bg-orange-50 text-orange-700 font-black font-mono">
+                        {currentPage} / {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => setCurrentPage((p) => p + 1)}
+                        className="px-2.5 py-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold disabled:opacity-40 cursor-pointer shadow-2xs"
+                      >
+                        Next
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* ─── TAB 2: ADD / EDIT PROPERTY FORM (EXECUTIVE STUDIO FULL WIDTH) ─── */}
+            {/* ─── TAB 2: ADD / EDIT PROPERTY ONBOARDING STUDIO ─── */}
             {view === 'add' && (
-              <form onSubmit={handleSaveListing} className="space-y-3 w-full">
-                
-                {/* Standard Reusable Header */}
-                <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
-                  <PageHeader
-                    icon="ri-building-2-fill"
-                    title={editingId ? 'Edit Property Listing' : 'Property Onboarding Studio'}
-                    badge={editingId ? 'Editing Mode' : 'New Listing'}
-                    subtitle="Structured data entry • Auto-generates WhatsApp pitch flyer & CRM sync"
-                    className="pb-0 border-b-0"
-                    rightContent={
-                      editingId && (
-                        <button
-                          type="button"
-                          onClick={() => { setForm(emptyFlatListing()); setEditingId(null); }}
-                          className="text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl transition cursor-pointer"
-                        >
-                          Cancel Edit
-                        </button>
-                      )
-                    }
-                  />
-                </div>
-
-                {/* ─── SECTION 1: CLASSIFICATION, DEAL TYPE & PROPERTY CATEGORY ─── */}
-                <div className="rounded-2xl border border-orange-500/25 bg-gradient-to-b from-orange-50/30 via-white to-white p-3.5 sm:p-4.5 space-y-3.5 shadow-xs relative overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-orange-500 via-amber-500 to-cyan-500" />
-
-                  {/* Step Header */}
-                  <div className="flex items-center justify-between pb-2 border-b border-orange-100/70">
-                    <div className="flex items-center gap-2">
-                      <span className="h-5.5 w-5.5 rounded-lg bg-orange-600 text-white flex items-center justify-center font-black text-[11px] shadow-xs">
-                        1
-                      </span>
-                      <div>
-                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                          Classification &amp; Deal Configuration
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-orange-100 text-orange-800 border border-orange-200">
-                            Required
-                          </span>
-                        </h3>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-black text-orange-700 bg-orange-50 px-2.5 py-0.5 rounded-md border border-orange-200/70">
-                      Step 1 of 3
-                    </span>
-                  </div>
-
-                  {/* Primary Row: Deal Intent (Light Orange Theme) + Category Selection */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 text-xs">
-                    
-                    {/* Deal Type Switcher (Light Orange Executive Box) */}
-                    <div className="lg:col-span-5 p-3 rounded-2xl bg-gradient-to-br from-orange-50/90 via-amber-50/50 to-orange-100/50 border border-orange-200/90 shadow-2xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-black text-orange-950 uppercase tracking-wider flex items-center gap-1.5">
-                          <i className="ri-fire-fill text-orange-600 text-xs" />
-                          Deal Intent
-                        </label>
-                        <span className={`text-[9.5px] font-black px-2 py-0.5 rounded-md border uppercase shadow-2xs ${
-                          form.listingType === 'buy'
-                            ? 'bg-orange-100 text-orange-900 border-orange-300'
-                            : 'bg-cyan-100 text-cyan-900 border-cyan-300'
-                        }`}>
-                          Active: {form.listingType === 'buy' ? 'For Sale' : 'For Rent'}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setForm({
-                              ...form,
-                              listingType: 'buy',
-                              propertyCategory: 'Flat',
-                              configuration: form.configuration?.includes('BHK') || form.configuration === '1 RK' || form.configuration === 'Jad se' ? form.configuration : '2 BHK',
-                              sizeSqft: form.sizeSqft?.includes('Gaj') ? form.sizeSqft : '50 Gaj (450 sq.ft)',
-                            });
-                          }}
-                          className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                            form.listingType === 'buy'
-                              ? 'bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white border-orange-600 shadow-md shadow-orange-500/30 font-black scale-[1.02] ring-2 ring-orange-400/40'
-                              : 'bg-white/90 text-slate-700 border-slate-200 hover:bg-white hover:text-orange-950 shadow-2xs'
-                          }`}
-                        >
-                          <i className="ri-price-tag-3-fill text-xs" />
-                          <span>For Sale / Buy</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setForm({ ...form, listingType: 'rent' })}
-                          className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                            form.listingType === 'rent'
-                              ? 'bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 text-white border-blue-500 shadow-md shadow-blue-500/30 font-black scale-[1.02] ring-2 ring-blue-400/40'
-                              : 'bg-white/90 text-slate-700 border-slate-200 hover:bg-white hover:text-blue-950 shadow-2xs'
-                          }`}
-                        >
-                          <i className="ri-key-2-fill text-xs" />
-                          <span>For Rent / Lease</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Category Selection (7 Cols) */}
-                    <div className="lg:col-span-7 p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                          <i className="ri-layout-grid-fill text-orange-600 text-xs" />
-                          {form.listingType === 'rent' ? 'Rental Property Category' : 'Sale Property Category'}
-                        </label>
-                        <span className="text-[9.5px] font-bold text-slate-400">
-                          {form.listingType === 'rent' ? '2 Options Available' : 'Flat Inventory'}
-                        </span>
-                      </div>
-
-                      {form.listingType === 'rent' ? (
-                        /* For Rent / Lease: 2 Options (Flat & Commercial) */
-                        <div className="grid grid-cols-2 gap-2">
-                          {/* 1. FLAT */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setForm({
-                                ...form,
-                                propertyCategory: 'Flat',
-                                configuration: form.configuration?.includes('BHK') || form.configuration === '1 RK' || form.configuration === 'Jad se' ? form.configuration : '2 BHK',
-                                sizeSqft: form.sizeSqft?.includes('Gaj') ? form.sizeSqft : '50 Gaj (450 sq.ft)',
-                              });
-                            }}
-                            className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer flex items-center justify-between ${
-                              (form.propertyCategory === 'Flat' || form.propertyCategory === 'HK' || form.propertyCategory === 'RK' || (!form.propertyCategory && form.propertyCategory !== 'Commercial'))
-                                ? 'bg-gradient-to-br from-orange-500/10 via-amber-500/10 to-orange-50 border-orange-500 text-orange-950 font-black shadow-xs ring-2 ring-orange-500/30'
-                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="h-8 w-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center text-base shrink-0 font-bold">
-                                🏠
-                              </span>
-                              <div>
-                                <span className="block text-xs font-black">Residential Flat</span>
-                                <span className="text-[9.5px] text-slate-500 font-medium">Builder Floors &amp; Units</span>
-                              </div>
-                            </div>
-                            {(form.propertyCategory === 'Flat' || form.propertyCategory === 'HK' || form.propertyCategory === 'RK' || (!form.propertyCategory && form.propertyCategory !== 'Commercial')) && (
-                              <i className="ri-checkbox-circle-fill text-orange-600 text-base" />
-                            )}
-                          </button>
-
-                          {/* 2. COMMERCIAL */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const sub = form.commercialSubType || 'Office';
-                              setForm({
-                                ...form,
-                                propertyCategory: 'Commercial',
-                                commercialSubType: sub,
-                                configuration: sub === 'Office' ? 'Furnished Office' : 'Main Road Shop',
-                                sizeSqft: form.sizeSqft?.includes('sq.ft') ? form.sizeSqft : '500 sq.ft',
-                              });
-                            }}
-                            className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer flex items-center justify-between ${
-                              (form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop')
-                                ? 'bg-gradient-to-br from-blue-500/10 via-indigo-500/10 to-blue-50 border-blue-600 text-blue-950 font-black shadow-xs ring-2 ring-blue-500/30'
-                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="h-8 w-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-base shrink-0 font-bold">
-                                🏢
-                              </span>
-                              <div>
-                                <span className="block text-xs font-black text-blue-950">Commercial</span>
-                                <span className="text-[9.5px] text-blue-700 font-medium">Office &amp; Retail Shop</span>
-                              </div>
-                            </div>
-                            {(form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop') && (
-                              <i className="ri-checkbox-circle-fill text-blue-600 text-base" />
-                            )}
-                          </button>
-                        </div>
-                      ) : (
-                        /* For Sale / Buy: Flat Only (Commercial & Plot not available for sale) */
-                        <div className="p-2 rounded-xl bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 border border-orange-200 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="h-8 w-8 rounded-lg bg-orange-500 text-white flex items-center justify-center text-base shrink-0 font-bold shadow-xs">
-                              🏠
-                            </span>
-                            <div>
-                              <span className="block text-xs font-black text-orange-950">
-                                Residential Builder Floor &amp; Flat
-                              </span>
-                              <span className="text-[10px] text-orange-800 font-medium">
-                                Commercial spaces &amp; plots are listed under Rent / Lease.
-                              </span>
-                            </div>
-                          </div>
-                          <span className="px-2 py-0.5 rounded bg-orange-600 text-white text-[9px] font-black uppercase tracking-wider shrink-0">
-                            Sale Active
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-
-                  {/* ─── DYNAMIC SUB-CONFIGURATION PANELS ─── */}
-
-                  {/* A) WHEN COMMERCIAL IS SELECTED (ONLY IN RENT/LEASE): 2 Options (Office & Shop) */}
-                  {form.listingType === 'rent' && (form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop') && (
-                    <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-slate-50 border border-blue-200/90 space-y-3 animate-in fade-in duration-150 shadow-xs">
-                      
-                      {/* Commercial Sub-type Toggle: Office vs Shop */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10.5px] font-black text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
-                            <i className="ri-store-2-fill text-blue-600 text-xs" />
-                            Commercial Unit Type (Select Office or Shop)
-                          </label>
-                          <span className="text-[9px] font-bold text-blue-800 bg-blue-100/90 px-2 py-0.2 rounded border border-blue-200">
-                            Active: <strong>{form.commercialSubType === 'Shop' ? 'Retail Shop' : 'Commercial Office'}</strong>
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                          {/* 1. OFFICE */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setForm({
-                                ...form,
-                                propertyCategory: 'Commercial',
-                                commercialSubType: 'Office',
-                                configuration: 'Furnished Office',
-                                sizeSqft: form.sizeSqft?.includes('sq.ft') ? form.sizeSqft : '500 sq.ft',
-                              });
-                            }}
-                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
-                              (form.commercialSubType === 'Office' || (!form.commercialSubType && form.propertyCategory !== 'Shop'))
-                                ? 'bg-white border-blue-600 text-blue-950 shadow-sm ring-2 ring-blue-500/40 font-black'
-                                : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="h-8 w-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-lg shrink-0">
-                                💼
-                              </span>
-                              <div>
-                                <span className="block font-black text-xs text-blue-950">Commercial Office</span>
-                                <span className="text-[9px] text-slate-500 font-medium">IT, Corporate Suites &amp; Cabins</span>
-                              </div>
-                            </div>
-                            {(form.commercialSubType === 'Office' || (!form.commercialSubType && form.propertyCategory !== 'Shop')) && (
-                              <i className="ri-checkbox-circle-fill text-blue-600 text-base" />
-                            )}
-                          </button>
-
-                          {/* 2. SHOP */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setForm({
-                                ...form,
-                                propertyCategory: 'Commercial',
-                                commercialSubType: 'Shop',
-                                configuration: 'Main Road Shop',
-                                sizeSqft: form.sizeSqft?.includes('sq.ft') ? form.sizeSqft : '200 sq.ft',
-                              });
-                            }}
-                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
-                              form.commercialSubType === 'Shop'
-                                ? 'bg-white border-indigo-600 text-indigo-950 shadow-sm ring-2 ring-indigo-500/40 font-black'
-                                : 'bg-white/70 border-slate-200 text-slate-700 hover:bg-white'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="h-8 w-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg shrink-0">
-                                🏪
-                              </span>
-                              <div>
-                                <span className="block font-black text-xs text-indigo-950">Retail Shop / Showroom</span>
-                                <span className="text-[9px] text-slate-500 font-medium">Market Fronts, Booths &amp; Retail</span>
-                              </div>
-                            </div>
-                            {form.commercialSubType === 'Shop' && (
-                              <i className="ri-checkbox-circle-fill text-indigo-600 text-base" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Commercial Specs: Layout Chips + Area Presets */}
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 text-xs pt-1 border-t border-blue-100">
-                        {/* Sub-layout / Spec chips (7 cols) */}
-                        <div className="md:col-span-7 space-y-1">
-                          <label className="text-[10px] font-bold text-slate-700 block">
-                            {form.commercialSubType === 'Shop' ? 'Shop Spec / Location' : 'Office Layout / Furnishing'}
-                            <span className="text-blue-600 font-bold ml-1">({form.configuration})</span>
-                          </label>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
-                            {(form.commercialSubType === 'Shop'
-                              ? ['Main Road Shop', 'Corner Shop', 'Ground Retail', 'Basement Godown', 'Showroom', 'Market Booth']
-                              : ['Furnished Office', 'Bare Shell', 'Semi-Furnished', 'Co-Working Hub', 'Cabin Suite', 'Full Floor']
-                            ).map((spec) => (
-                              <button
-                                key={spec}
-                                type="button"
-                                onClick={() => setForm({ ...form, configuration: spec })}
-                                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer border truncate text-center ${
-                                  form.configuration === spec
-                                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs font-black'
-                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-900'
-                                }`}
-                              >
-                                {spec}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Commercial Area / Carpet Size (5 cols) */}
-                        <div className="md:col-span-5 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[10px] font-bold text-slate-700">Carpet / Super Area</label>
-                            <span className="text-[9px] text-slate-400 font-medium">Sq.ft / Gaj</span>
-                          </div>
-                          <input
-                            type="text"
-                            value={form.sizeSqft}
-                            onChange={(e) => setForm({ ...form, sizeSqft: e.target.value })}
-                            placeholder={form.commercialSubType === 'Shop' ? 'e.g. 200 sq.ft (22 Gaj)' : 'e.g. 500 sq.ft (55 Gaj)'}
-                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-400 outline-none text-xs font-bold text-slate-900 shadow-2xs"
-                          />
-                          <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                            {(form.commercialSubType === 'Shop'
-                              ? [
-                                  { label: '100 sq.ft', val: '100 sq.ft (11 Gaj)' },
-                                  { label: '200 sq.ft', val: '200 sq.ft (22 Gaj)' },
-                                  { label: '350 sq.ft', val: '350 sq.ft (39 Gaj)' },
-                                  { label: '500 sq.ft', val: '500 sq.ft (55 Gaj)' },
-                                  { label: '1000 sq.ft', val: '1000 sq.ft (111 Gaj)' },
-                                ]
-                              : [
-                                  { label: '150 sq.ft', val: '150 sq.ft (16 Gaj)' },
-                                  { label: '300 sq.ft', val: '300 sq.ft (33 Gaj)' },
-                                  { label: '500 sq.ft', val: '500 sq.ft (55 Gaj)' },
-                                  { label: '1000 sq.ft', val: '1000 sq.ft (111 Gaj)' },
-                                  { label: '2500 sq.ft', val: '2500 sq.ft (277 Gaj)' },
-                                ]
-                            ).map((preset) => (
-                              <button
-                                key={preset.label}
-                                type="button"
-                                onClick={() => setForm({ ...form, sizeSqft: preset.val })}
-                                className="px-1.5 py-0.5 rounded bg-white hover:bg-blue-100 hover:text-blue-900 text-[9px] font-bold text-slate-600 border border-slate-200 transition cursor-pointer"
-                              >
-                                {preset.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-                  )}
-
-                  {/* B) WHEN FLAT (RESIDENTIAL) IS SELECTED (IN EITHER SALE OR RENT) */}
-                  {(form.propertyCategory === 'Flat' || form.propertyCategory === 'HK' || form.propertyCategory === 'RK' || form.listingType === 'buy' || (!form.propertyCategory && form.propertyCategory !== 'Commercial')) && (
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 text-xs p-3.5 rounded-2xl bg-gradient-to-r from-orange-50/60 via-amber-50/40 to-orange-50/30 border border-orange-200/80 shadow-2xs">
-                      {/* Configuration Layout (7 Cols) */}
-                      <div className="md:col-span-7 space-y-1">
-                        <label className="text-[10.5px] font-bold text-slate-800 block">
-                          BHK Configuration <span className="text-orange-600 font-bold">({form.configuration})</span>
-                        </label>
-                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                          {['1 RK', '1 BHK', '2 BHK', '3 BHK', '4 BHK', 'Jad se'].map((bhk) => (
-                            <button
-                              key={bhk}
-                              type="button"
-                              onClick={() => setForm({ ...form, configuration: bhk })}
-                              className={`py-2 rounded-xl text-xs font-bold transition cursor-pointer border truncate text-center ${
-                                form.configuration === bhk
-                                  ? 'bg-orange-600 text-white border-orange-600 shadow-xs font-black scale-[1.02]'
-                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-orange-50 hover:text-orange-950'
-                              }`}
-                            >
-                              {bhk}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Plot Size / Area (5 Cols) */}
-                      <div className="md:col-span-5 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10.5px] font-bold text-slate-800">Plot Size / Carpet Area</label>
-                          <span className="text-[9px] text-slate-400 font-medium">Gaj &amp; Sq.ft</span>
-                        </div>
-                        <input
-                          type="text"
-                          value={form.sizeSqft}
-                          onChange={(e) => setForm({ ...form, sizeSqft: e.target.value })}
-                          placeholder="e.g. 50 Gaj (450 sq.ft)"
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-orange-500 outline-none text-xs font-bold text-slate-900 shadow-2xs"
-                        />
-                        <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                          {[
-                            { label: '30G', val: '30 Gaj (270 sq.ft)' },
-                            { label: '40G', val: '40 Gaj (360 sq.ft)' },
-                            { label: '50G', val: '50 Gaj (450 sq.ft)' },
-                            { label: '60G', val: '60 Gaj (540 sq.ft)' },
-                            { label: '100G', val: '100 Gaj (900 sq.ft)' },
-                          ].map((preset) => (
-                            <button
-                              key={preset.label}
-                              type="button"
-                              onClick={() => setForm({ ...form, sizeSqft: preset.val })}
-                              className="px-1.5 py-0.5 rounded bg-white hover:bg-orange-100 hover:text-orange-800 text-[9px] font-bold text-slate-600 border border-slate-200 transition cursor-pointer"
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-
-                {/* ─── SECTION 2: FLOOR & BUILDING FACILITIES (LIFT, PARKING, LOCATION) ─── */}
-                <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 space-y-3 shadow-2xs">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <span className="h-5 w-5 rounded-lg bg-orange-600 text-white flex items-center justify-center font-black text-[10px]">
-                        2
-                      </span>
-                      <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
-                        Floor Position, Location &amp; Parking Infrastructure
-                      </h3>
-                    </div>
-                    <span className="text-[10px] font-black text-orange-700 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200/70">
-                      Step 2 of 3
-                    </span>
-                  </div>
-
-                  {/* 1. Floor Dropdown Selection & Custom Floor */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                        <i className="ri-building-line text-orange-600" />
-                        Select Floor Position <span className="text-orange-600 font-bold">*</span>
-                      </label>
-                      <span className="text-[10px] text-slate-400 font-medium">Standard Delhi NCR Builder Floors</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      {/* Floor Dropdown */}
-                      <div className="relative">
-                        <select
-                          value={isCustomFloor ? 'Other' : form.floor}
-                          onChange={(e) => {
-                            if (e.target.value === 'Other') {
-                              setIsCustomFloor(true);
-                              setForm({ ...form, floor: '' });
-                            } else {
-                              setIsCustomFloor(false);
-                              setForm({ ...form, floor: e.target.value });
-                            }
-                          }}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-400 outline-none text-xs font-bold text-slate-800 appearance-none cursor-pointer pr-8 shadow-2xs"
-                        >
-                          <option value="">-- Select Floor Position --</option>
-                          {(form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop') ? (
-                            <>
-                              <option value="Ground Floor (Main Road Front)">Ground Floor (Main Road Front)</option>
-                              <option value="Ground Floor (Inside Market / Plaza)">Ground Floor (Inside Market / Plaza)</option>
-                              <option value="Upper Ground (Commercial)">Upper Ground (Commercial)</option>
-                              <option value="1st Floor (Commercial Front)">1st Floor (Commercial Front)</option>
-                              <option value="2nd Floor (Office Suite)">2nd Floor (Office Suite)</option>
-                              <option value="3rd Floor / Corporate Tower">3rd Floor / Corporate Tower</option>
-                              <option value="Basement (Commercial / Storage)">Basement (Commercial / Storage)</option>
-                              <option value="Full Standalone Commercial Building">Full Standalone Commercial Building</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="Ground Floor (Front Side)">Ground Floor (Front Side) [G-FS]</option>
-                              <option value="Ground Floor (Back Side)">Ground Floor (Back Side) [G-BS]</option>
-                              <option value="Upper Ground (Front Side)">Upper Ground (Front Side) [UG-FS]</option>
-                              <option value="1st Floor (Front Side)">1st Floor (Front Side) [1ST-FS]</option>
-                              <option value="2nd Floor (Back Side)">2nd Floor (Back Side) [2ND-BS]</option>
-                              <option value="3rd Floor (Front Side)">3rd Floor (Front Side) [3RD-FS]</option>
-                              <option value="Top Floor with Roof Rights">Top Floor with Roof Rights [T-BS]</option>
-                              <option value="Basement Floor">Basement / Lower Ground [BSMT]</option>
-                              <option value="Duplex">Duplex Floor</option>
-                              <option value="Independent House / Villa">Independent House / Villa</option>
-                            </>
-                          )}
-                          <option value="Other" className="font-bold text-orange-600">✍️ Other (Custom Floor)...</option>
-                        </select>
-                        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">
-                          <i className="ri-arrow-down-s-line text-sm" />
-                        </div>
-                      </div>
-
-                      {/* Custom Floor Input (Unlocks ONLY when Other is selected, otherwise frozen) */}
-                      <div className="relative">
-                        {isCustomFloor ? (
-                          <div className="relative">
-                            <i className="ri-edit-2-fill absolute left-3 top-1/2 -translate-y-1/2 text-orange-600 text-xs" />
-                            <input
-                              type="text"
-                              value={form.floor}
-                              onChange={(e) => setForm({ ...form, floor: e.target.value })}
-                              placeholder="Type custom floor (e.g. 4th Floor Front, Penthouse)..."
-                              required={isCustomFloor}
-                              autoFocus
-                              className="w-full pl-8 pr-3 py-2 rounded-xl border-2 border-orange-500 bg-white focus:border-orange-600 focus:ring-2 focus:ring-orange-500/20 outline-none text-xs font-bold text-slate-900 shadow-sm animate-in fade-in duration-150"
-                            />
-                          </div>
-                        ) : (
-                          <div className="relative" title="Select 'Other (Custom Floor)...' in dropdown to type custom floor">
-                            <i className="ri-lock-2-line absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
-                            <input
-                              type="text"
-                              value={form.floor ? `Selected: ${form.floor}` : 'Standard Floor (Select "Other" to customize)'}
-                              disabled
-                              className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-100/90 text-slate-500 outline-none text-xs font-medium cursor-not-allowed select-none opacity-85"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 2. OPTION 2 (SHIFTED): LOCATION / COLONY & ADDRESS LANDMARK */}
-                  <div className="p-3 rounded-xl bg-gradient-to-r from-orange-50/40 via-slate-50 to-amber-50/40 border border-orange-200/70 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-black text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
-                        <i className="ri-map-pin-2-fill text-orange-600 text-xs" />
-                        Location / Colony &amp; Address Landmark
-                      </label>
-                      <span className="text-[9px] font-bold text-orange-700 bg-orange-100/80 px-2 py-0.2 rounded border border-orange-200">
-                        Site Location
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                          Location / Colony <span className="text-orange-600">*</span>
-                        </label>
-                        <div className="relative">
-                          <i className="ri-map-pin-line absolute left-2.5 top-1/2 -translate-y-1/2 text-orange-500 text-xs" />
-                          <input
-                            type="text"
-                            value={form.location}
-                            onChange={(e) => setForm({ ...form, location: e.target.value })}
-                            placeholder="e.g. Bhagwati Garden, Dwarka Mor"
-                            required
-                            className="w-full pl-7 pr-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-400 outline-none font-medium text-xs shadow-2xs"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-1">Address Landmark</label>
-                        <div className="relative">
-                          <i className="ri-building-2-line absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
-                          <input
-                            type="text"
-                            value={form.completeAddress}
-                            onChange={(e) => setForm({ ...form, completeAddress: e.target.value })}
-                            placeholder="e.g. Near Spring Medical, Pillar 750"
-                            className="w-full pl-7 pr-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-400 outline-none font-medium text-xs shadow-2xs"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 3. Lift & Parking Facilities (2 Compact Columns) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 border-t border-slate-100 text-xs">
-                    
-                    {/* Lift Facility */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-700 block">Elevator / Lift Facility</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setForm({ ...form, lift: 'YES' })}
-                          className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-                            form.lift === 'YES'
-                              ? 'bg-emerald-50 text-emerald-900 border-emerald-500 shadow-2xs ring-1 ring-emerald-400 font-black'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          <span className="text-base">🛗</span>
-                          <div className="text-left">
-                            <span className="block font-bold text-[11px]">Lift Available</span>
-                            <span className="text-[9px] text-emerald-700 font-medium">Automatic</span>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setForm({ ...form, lift: 'NO' })}
-                          className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-                            form.lift === 'NO'
-                              ? 'bg-slate-100 text-slate-900 border-slate-400 shadow-2xs font-black'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          <span className="text-base">🚫</span>
-                          <div className="text-left">
-                            <span className="block font-bold text-[11px]">No Lift</span>
-                            <span className="text-[9px] text-slate-500 font-medium">Stairs</span>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Parking Facility */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-700 block">
-                        Vehicle Parking: <span className="text-orange-600 font-medium">{form.parking && form.parking !== 'No Parking' ? form.parking : 'No Parking'}</span>
-                      </label>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setForm({ ...form, parking: form.parking && form.parking !== 'No Parking' ? form.parking : 'Car + Bike Parking' })}
-                          className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-                            form.parking && form.parking !== 'No Parking'
-                              ? 'bg-emerald-50 text-emerald-900 border-emerald-500 shadow-2xs ring-1 ring-emerald-400 font-black'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          <span className="text-base">🚗</span>
-                          <div className="text-left">
-                            <span className="block font-bold text-[11px]">Parking (YES)</span>
-                            <span className="text-[9px] text-emerald-700 font-medium">Dedicated</span>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setForm({ ...form, parking: 'No Parking' })}
-                          className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-                            form.parking === 'No Parking'
-                              ? 'bg-slate-100 text-slate-900 border-slate-400 shadow-2xs font-black'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          <span className="text-base">🚫</span>
-                          <div className="text-left">
-                            <span className="block font-bold text-[11px]">No Parking</span>
-                            <span className="text-[9px] text-slate-500 font-medium">Street</span>
-                          </div>
-                        </button>
-                      </div>
-
-                      {/* When YES: 4 Compact Vehicle Radio Cards */}
-                      {form.parking && form.parking !== 'No Parking' && (
-                        <div className="p-2 bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl border border-orange-200/80 space-y-1 animate-in fade-in duration-150">
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 text-xs">
-                            {[
-                              { label: 'Car + Bike', icon: '🚗🏍️', val: 'Car + Bike Parking' },
-                              { label: 'Car Only', icon: '🚗', val: 'Car Parking Only' },
-                              { label: 'Bike Only', icon: '🏍️', val: 'Bike Parking Only' },
-                              { label: 'Covered Stilt', icon: '🅿️', val: 'Covered Stilt Parking' },
-                            ].map((pOpt) => {
-                              const isSelected = form.parking === pOpt.val;
-                              return (
-                                <div
-                                  key={pOpt.val}
-                                  onClick={() => setForm({ ...form, parking: pOpt.val })}
-                                  className={`py-1.5 px-2 rounded-lg border text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer select-none ${
-                                    isSelected
-                                      ? 'bg-white border-orange-500 text-orange-950 shadow-xs ring-1 ring-orange-400 font-black'
-                                      : 'bg-white/70 text-slate-700 border-slate-200 hover:bg-white'
-                                  }`}
-                                >
-                                  <span className="text-xs shrink-0">{pOpt.icon}</span>
-                                  <span className="font-bold truncate text-[10px]">{pOpt.label}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                </div>
-
-                {/* ─── SECTION 3: COMMERCIALS, ASSOCIATE & AMENITIES ─── */}
-                <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 space-y-3 shadow-2xs">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <span className="h-5 w-5 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-black text-[10px]">
-                        3
-                      </span>
-                      <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
-                        {form.listingType === 'rent' ? 'Pricing, Owner' : 'Pricing, Owner & Builder'}
-                      </h3>
-                    </div>
-                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70">
-                      Step 3 of 3
-                    </span>
-                  </div>
-
-                  {/* 1. Pricing Row */}
-                  <div className="space-y-2">
-                    <div className={`grid grid-cols-1 ${form.listingType === 'rent' ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-3 text-xs`}>
-                      {/* Demand Price / Monthly Rent */}
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                          {form.listingType === 'rent' ? 'Monthly Rent (₹)' : 'Demand Price (₹)'} <span className="text-orange-600">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          value={form.listingType === 'rent' ? form.monthlyRent : form.salePrice}
-                          onChange={(e) =>
-                            setForm(
-                              form.listingType === 'rent'
-                                ? { ...form, monthlyRent: e.target.value }
-                                : { ...form, salePrice: e.target.value }
-                            )
-                          }
-                          placeholder={form.listingType === 'rent' ? 'e.g. 15000' : 'e.g. 2000000'}
-                          required
-                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 outline-none font-black text-emerald-700 text-xs"
-                        />
-                        {/* Quick Amount Chips */}
-                        <div className="flex items-center gap-1 mt-1 flex-wrap">
-                          {(form.listingType === 'rent'
-                            ? [
-                                { label: '8k', val: 8000 },
-                                { label: '10k', val: 10000 },
-                                { label: '12k', val: 12000 },
-                                { label: '15k', val: 15000 },
-                                { label: '20k', val: 20000 },
-                                { label: '25k', val: 25000 },
-                              ]
-                            : [
-                                { label: '15L', val: 1500000 },
-                                { label: '20L', val: 2000000 },
-                                { label: '25L', val: 2500000 },
-                                { label: '30L', val: 3000000 },
-                                { label: '45L', val: 4500000 },
-                                { label: '1 Cr', val: 10000000 },
-                              ]
-                          ).map((chip) => (
-                            <button
-                              key={chip.label}
-                              type="button"
-                              onClick={() => {
-                                if (form.listingType === 'rent') {
-                                  setForm({ ...form, monthlyRent: chip.val });
-                                } else {
-                                  setForm({ ...form, salePrice: chip.val });
-                                }
-                              }}
-                              className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-[10px] font-bold text-slate-600 border border-slate-200 transition cursor-pointer"
-                            >
-                              {chip.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Net Negotiable Price / Net Rent */}
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                          {form.listingType === 'rent' ? 'Net Rent (₹)' : 'Net Price (₹)'} <span className="text-slate-400 font-normal">(Optional)</span>
-                        </label>
-                        <input
-                          type="number"
-                          value={form.netProfit}
-                          onChange={(e) => setForm({ ...form, netProfit: e.target.value })}
-                          placeholder={form.listingType === 'rent' ? 'e.g. 13500' : 'e.g. 1900000'}
-                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 outline-none font-bold text-amber-700 text-xs"
-                        />
-                        {form.netProfit > 0 && (
-                          <div className="mt-1 text-[10px] text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/70 inline-block">
-                            Net: {formatINR(form.netProfit)}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Commission / Brokerage (ONLY FOR RENT) */}
-                      {form.listingType === 'rent' && (
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                            Rental Brokerage <span className="text-orange-600 font-normal">(Term)</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={form.commission}
-                            onChange={(e) => setForm({ ...form, commission: e.target.value })}
-                            placeholder="e.g. 15 Days Rent, 1 Month"
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 outline-none font-bold text-orange-700 text-xs"
-                          />
-                          <div className="flex items-center gap-1 mt-1 flex-wrap">
-                            {[
-                              { label: '15 Days', val: '15 Days Rent' },
-                              { label: '1 Month', val: '1 Month Rent' },
-                              { label: '50%', val: '50% Brokerage' },
-                            ].map((preset) => (
-                              <button
-                                key={preset.label}
-                                type="button"
-                                onClick={() => setForm({ ...form, commission: preset.val })}
-                                className="px-1.5 py-0.5 rounded bg-orange-50 hover:bg-orange-100 hover:text-orange-900 text-[10px] font-bold text-orange-700 border border-orange-200 transition cursor-pointer"
-                              >
-                                {preset.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 2. Sourced Associate & Media Hub Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100 text-xs">
-                    {/* Associate / Sourced By Column */}
-                    <div className="space-y-2">
-                      <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                        <i className="ri-user-star-line text-orange-600 text-xs" /> {form.listingType === 'rent' ? 'Owner / Contact Person' : 'Owner / Builder / Partner'}
-                      </h4>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
-                            {form.listingType === 'rent' ? 'Owner Name' : 'Owner / Builder Name'}
-                          </label>
-                          <input
-                            type="text"
-                            value={form.ownerName}
-                            onChange={(e) => setForm({ ...form, ownerName: e.target.value })}
-                            placeholder={form.listingType === 'rent' ? 'e.g. Ramesh Kumar' : 'e.g. Dharmendra, Tripathi Ji'}
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 outline-none text-xs font-medium"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Contact Phone</label>
-                          <input
-                            type="text"
-                            value={form.ownerContact}
-                            onChange={(e) => setForm({ ...form, ownerContact: e.target.value })}
-                            placeholder="e.g. 9560587733"
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 outline-none font-mono text-xs"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Media Studio Column (Cover + Gallery) */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                          <i className="ri-image-2-line text-orange-600 text-xs" /> Media Studio
-                        </h4>
-                        {(form.images || []).length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setForm({ ...form, images: [] })}
-                            className="text-[10px] text-red-600 hover:text-red-700 font-bold hover:underline cursor-pointer"
-                          >
-                            Clear Gallery ({(form.images || []).length})
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* 1. Primary Cover Photo Card */}
-                        <div>
-                          <input
-                            type="file"
-                            id="coverPhotoUploadInput"
-                            accept="image/*"
-                            onChange={handleCoverUpload}
-                            className="hidden"
-                          />
-
-                          {form.coverImage ? (
-                            <div className="relative h-18 w-full rounded-xl overflow-hidden border border-orange-300 bg-slate-100 group shadow-2xs">
-                              <img src={form.coverImage} alt="Cover Preview" className="h-full w-full object-cover" />
-                              <span className="absolute top-1 left-1 px-1.5 py-0.2 rounded bg-orange-600/90 text-white font-bold text-[8px]">
-                                Cover
-                              </span>
-                              <label
-                                htmlFor="coverPhotoUploadInput"
-                                className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold gap-1 cursor-pointer"
-                              >
-                                <i className="ri-camera-switch-line" /> Change
-                              </label>
-                            </div>
-                          ) : (
-                            <label
-                              htmlFor="coverPhotoUploadInput"
-                              className="h-18 w-full rounded-xl border-2 border-dashed border-slate-200 hover:border-orange-400 bg-slate-50/70 hover:bg-orange-50/40 transition flex flex-col items-center justify-center gap-0.5 cursor-pointer group select-none text-center p-1"
-                            >
-                              <div className="h-6 w-6 rounded-lg bg-orange-100 text-orange-600 group-hover:bg-orange-500 group-hover:text-white transition flex items-center justify-center text-xs">
-                                <i className="ri-image-add-line" />
-                              </div>
-                              <span className="text-[10px] font-bold text-slate-700 group-hover:text-orange-950">Cover Photo</span>
-                            </label>
-                          )}
-                        </div>
-
-                        {/* 2. Gallery Photos Upload Card */}
-                        <div>
-                          <input
-                            type="file"
-                            id="galleryPhotosUploadInput"
-                            multiple
-                            accept="image/*"
-                            onChange={handleGalleryUpload}
-                            className="hidden"
-                          />
-
-                          <label
-                            htmlFor="galleryPhotosUploadInput"
-                            className="h-18 w-full rounded-xl border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/40 transition flex flex-col items-center justify-center gap-0.5 cursor-pointer group select-none text-center p-1"
-                          >
-                            <div className="h-6 w-6 rounded-lg bg-blue-100 text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition flex items-center justify-center text-xs">
-                              <i className="ri-folder-image-line" />
-                            </div>
-                            <span className="text-[10px] font-bold text-slate-700 group-hover:text-blue-950">Add Photos</span>
-                            <span className="text-[9px] text-blue-600 font-semibold">{(form.images || []).length} added</span>
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* Gallery Thumbnails Strip */}
-                      {(form.images || []).length > 0 && (
-                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                          {form.images.map((img, idx) => (
-                            <div key={idx} className="relative group h-12 w-12 shrink-0 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs">
-                              <img src={img} alt={`Gallery ${idx + 1}`} className="h-full w-full object-cover" />
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveGalleryImage(idx)}
-                                className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-red-600 text-white flex items-center justify-center text-[9px] opacity-90 hover:opacity-100 transition cursor-pointer"
-                                title="Delete"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* 3. YouTube / Video Tour Walkthrough Input */}
-                      <div className="pt-2 border-t border-slate-100 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10.5px] font-bold text-slate-700 flex items-center gap-1">
-                            <i className="ri-youtube-fill text-red-600 text-xs" />
-                            YouTube / Walkthrough Video URL
-                          </label>
-                          {form.videoUrl && (
-                            <a
-                              href={form.videoUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[9.5px] font-bold text-red-600 hover:text-red-700 hover:underline flex items-center gap-0.5"
-                            >
-                              <i className="ri-external-link-line" /> Test Video Link
-                            </a>
-                          )}
-                        </div>
-                        <div className="relative">
-                          <i className="ri-play-circle-line absolute left-2.5 top-1/2 -translate-y-1/2 text-red-500 text-xs" />
-                          <input
-                            type="url"
-                            value={form.videoUrl}
-                            onChange={(e) => setForm({ ...form, videoUrl: e.target.value })}
-                            placeholder="e.g. https://youtu.be/... or YouTube video link"
-                            className="w-full pl-7 pr-7 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-red-500 outline-none text-xs font-medium text-slate-900 shadow-2xs"
-                          />
-                          {form.videoUrl && (
-                            <button
-                              type="button"
-                              onClick={() => setForm({ ...form, videoUrl: '' })}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
-                              title="Clear video URL"
-                            >
-                              ×
-                            </button>
-                          )}
-                        </div>
-                        <span className="text-[9px] text-slate-400 block">
-                          🎥 Video walkthrough link is automatically included in WhatsApp customer pitch flyers!
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 3. Verified Amenities Multi-Select */}
-                  <div className="pt-2 border-t border-slate-100 text-xs">
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1.5">Verified Amenities &amp; Features</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-1.5">
-                      {QUICK_AMENITIES.map((am) => {
-                        const isSelected = form.amenities && form.amenities.includes(am);
-                        return (
-                          <button
-                            key={am}
-                            type="button"
-                            onClick={() => handleAmenityToggle(am)}
-                            className={`p-1.5 rounded-lg border text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                              isSelected
-                                ? 'bg-orange-50 border-orange-500 text-orange-800 font-black shadow-2xs'
-                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            <i className={isSelected ? 'ri-checkbox-circle-fill text-orange-600 text-xs' : 'ri-checkbox-blank-circle-line text-slate-300 text-xs'} />
-                            <span className="truncate text-[11px]">{am}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* ─── COMPACT ACTION BAR ─── */}
-                <div className="flex items-center justify-between p-3 bg-white rounded-2xl border border-slate-200/90 shadow-xs">
-                  <button
-                    type="button"
-                    onClick={() => { setForm(emptyFlatListing()); setEditingId(null); setView('list'); }}
-                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
-                  >
-                    Reset / Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 via-orange-500 to-amber-600 hover:from-orange-700 hover:via-orange-600 hover:to-amber-700 text-white text-xs font-black shadow-md shadow-orange-500/25 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2 hover:shadow-lg active:scale-95"
-                  >
-                    {saving ? (
-                      <>
-                        <i className="ri-loader-4-line text-sm font-black animate-spin" />
-                        <span>{editingId ? 'Saving Changes...' : 'Publishing Property...'}</span>
-                      </>
-                    ) : (
-                      <>
-                        <i className="ri-check-line text-sm font-black" />
-                        <span>{editingId ? 'Save Changes' : 'Publish Property Listing'}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-              </form>
+              <PropertyFormStudio
+                form={form}
+                setForm={setForm}
+                editingId={editingId}
+                setEditingId={setEditingId}
+                onSave={handleSaveListing}
+                onCancel={() => { setForm(emptyFlatListing()); setEditingId(null); setView('list'); }}
+                saving={saving}
+                roleBadge="Sales Listing"
+              />
             )}
 
-            {/* ─── TAB 3: CLIENT LEADS (FULL WIDTH) ─── */}
+            {/* ─── TAB 3: CLIENT INQUIRY DESK ─── */}
             {view === 'leads' && (
               <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-xs space-y-3 w-full">
                 <PageHeader
@@ -2365,185 +584,8 @@ Contact *${salesmanName}* | Baba Broker Real Estate
               </div>
             )}
 
-            {/* ─── TAB 4: COMMISSION & EMI CALCULATOR (FULL WIDTH) ─── */}
-            {view === 'calculator' && (
-              <div className="space-y-3.5 w-full">
-                <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-xs">
-                  <PageHeader
-                    icon="ri-calculator-line"
-                    title="Financial Deal & EMI Calculators"
-                    subtitle="Compute brokerage commission, customer home loan EMI, and area unit conversions"
-                    badge="Sales Tools"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 w-full">
-                
-                {/* 1. Brokerage Calculator */}
-                <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                    <div className="h-6 w-6 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center font-black text-xs">
-                      <i className="ri-money-rupee-circle-line" />
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-black text-slate-900">Brokerage Calculator</h3>
-                      <p className="text-[10px] text-slate-400">Sales commission split</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Deal Sale Price (₹)</label>
-                      <input
-                        type="number"
-                        value={calcPrice}
-                        onChange={(e) => setCalcPrice(e.target.value)}
-                        placeholder="2500000"
-                        className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-900 outline-none"
-                      />
-                      <span className="text-[10px] text-orange-600 font-bold block mt-0.5">
-                        {formatINR(calcPrice)}
-                      </span>
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Brokerage %</label>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {[1, 1.5, 2].map((pct) => (
-                          <button
-                            key={pct}
-                            type="button"
-                            onClick={() => setCalcBrokeragePct(pct)}
-                            className={`py-1 rounded-lg font-bold text-xs transition ${
-                              calcBrokeragePct === pct
-                                ? 'bg-orange-600 text-white shadow-2xs'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
-                          >
-                            {pct}%
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-100 space-y-1 text-xs">
-                      <div className="flex justify-between text-slate-600 text-[11px]">
-                        <span>Gross Brokerage:</span>
-                        <span className="font-bold text-slate-900">{formatINR(calculatedCommission.gross)}</span>
-                      </div>
-                      <div className="flex justify-between text-slate-600 text-[11px]">
-                        <span>GST (18%):</span>
-                        <span className="font-bold text-slate-700">{formatINR(calculatedCommission.gst)}</span>
-                      </div>
-                      <div className="flex justify-between text-emerald-700 font-bold pt-1 border-t border-slate-200">
-                        <span>Agent Payout (40%):</span>
-                        <span className="font-black text-sm">{formatINR(calculatedCommission.agentPayout)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Client EMI Estimator */}
-                <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                    <div className="h-6 w-6 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-black text-xs">
-                      <i className="ri-bank-line" />
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-black text-slate-900">Home Loan EMI Estimator</h3>
-                      <p className="text-[10px] text-slate-400">Monthly repayment preview</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Loan Amount (₹)</label>
-                      <input
-                        type="number"
-                        value={calcLoanAmount}
-                        onChange={(e) => setCalcLoanAmount(e.target.value)}
-                        className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-900 outline-none"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Rate (% p.a.)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={calcInterestRate}
-                          onChange={(e) => setCalcInterestRate(Number(e.target.value))}
-                          className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 font-bold outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Tenure (Years)</label>
-                        <input
-                          type="number"
-                          value={calcTenureYears}
-                          onChange={(e) => setCalcTenureYears(Number(e.target.value))}
-                          className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 font-bold outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="bg-blue-50/70 p-3 rounded-2xl border border-blue-200/70 space-y-1 text-xs text-blue-950">
-                      <span className="text-[10px] font-black uppercase text-blue-700 block">Monthly Loan EMI</span>
-                      <span className="text-base font-black text-blue-700 block">
-                        ₹ {calculatedEMI.emi.toLocaleString('en-IN')} / month
-                      </span>
-                      <div className="flex justify-between text-[10px] pt-0.5 text-slate-600">
-                        <span>Total Interest:</span>
-                        <span className="font-bold">{formatINR(calculatedEMI.totalInterest)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Gaj / Land Unit Converter */}
-                <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                    <div className="h-6 w-6 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center font-black text-xs">
-                      <i className="ri-ruler-2-line" />
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-black text-slate-900">Gaj & Land Unit Converter</h3>
-                      <p className="text-[10px] text-slate-400">Delhi NCR land conversions</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Enter Area in Gaj (Gaz)</label>
-                      <input
-                        type="number"
-                        value={calcGajInput}
-                        onChange={(e) => setCalcGajInput(e.target.value)}
-                        placeholder="50"
-                        className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 font-black text-purple-700 text-sm outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5 pt-1">
-                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 flex justify-between items-center text-[11px]">
-                        <span className="font-bold text-slate-600">Square Feet (Sq.Ft):</span>
-                        <span className="font-black text-xs text-slate-900">{gajConversion.sqft} sq.ft</span>
-                      </div>
-                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 flex justify-between items-center text-[11px]">
-                        <span className="font-bold text-slate-600">Square Yards (Sq.Yd):</span>
-                        <span className="font-black text-xs text-slate-900">{gajConversion.sqyd} sq.yd</span>
-                      </div>
-                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 flex justify-between items-center text-[11px]">
-                        <span className="font-bold text-slate-600">Square Meters (Sq.M):</span>
-                        <span className="font-black text-xs text-slate-900">{gajConversion.sqm} sq.m</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              </div>
-            )}
-
+            {/* ─── TAB 4: CALCULATORS ─── */}
+            {view === 'calculator' && <CalculatorsPanel badge="Sales Tools" />}
           </main>
 
           {/* Footer */}
@@ -2554,515 +596,23 @@ Contact *${salesmanName}* | Baba Broker Real Estate
             <span>Direct Support: <a href="mailto:support@bababroker.com" className="text-[#ea580c] hover:underline">support@bababroker.com</a></span>
             <span className="hidden sm:inline">© 2026 Baba Broker. All rights reserved.</span>
           </footer>
-
         </div>
-
       </div>
 
-      {/* ─── MODAL: ADVANCED WHATSAPP PITCH STUDIO (3 STYLES) ─── */}
-      {pitchingProperty && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-5 shadow-2xl space-y-3 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base">
-                  <i className="ri-whatsapp-line" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-black text-slate-900">WhatsApp Client Pitch Studio</h3>
-                  <p className="text-[10px] text-slate-400">Generate personalized property flyers</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPitchingProperty(null)}
-                className="h-7 w-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer"
-              >
-                <i className="ri-close-line text-base" />
-              </button>
-            </div>
+      {/* Reusable Modals & Drawers */}
+      <WhatsAppPitchModal
+        property={pitchingProperty}
+        onClose={() => setPitchingProperty(null)}
+        senderName={salesmanName}
+      />
 
-            {/* Client Name & Client Phone Number */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">Client Name (Optional)</label>
-                <input
-                  type="text"
-                  value={pitchClientName}
-                  onChange={(e) => setPitchClientName(e.target.value)}
-                  placeholder="e.g. Rahul Sharma, Amit Ji"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 outline-none text-xs font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">Client Phone Number (WhatsApp)</label>
-                <div className="relative">
-                  <i className="ri-phone-fill absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 text-xs" />
-                  <input
-                    type="text"
-                    value={pitchClientPhone}
-                    onChange={(e) => setPitchClientPhone(e.target.value)}
-                    placeholder="e.g. 9876543210"
-                    className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 outline-none text-xs font-mono font-bold text-emerald-800"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Generated WhatsApp Message Preview */}
-            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 text-[11px] font-mono whitespace-pre-line text-slate-800 max-h-56 overflow-y-auto leading-relaxed">
-              {buildPitchText(pitchingProperty, pitchClientName)}
-            </div>
-
-            {/* Direct Send Action Button */}
-            <div className="pt-1">
-              <a
-                href={(() => {
-                  const clean = pitchClientPhone.replace(/\D/g, '');
-                  const phoneParam = clean ? (clean.length === 10 ? `91${clean}` : clean) : '';
-                  const textParam = encodeURIComponent(buildPitchText(pitchingProperty, pitchClientName));
-                  return phoneParam
-                    ? `https://api.whatsapp.com/send?phone=${phoneParam}&text=${textParam}`
-                    : `https://api.whatsapp.com/send?text=${textParam}`;
-                })()}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => { setPitchingProperty(null); setPitchClientPhone(''); }}
-                className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <i className="ri-whatsapp-fill text-base" />
-                <span>
-                  {pitchClientPhone
-                    ? `Send to WhatsApp (${pitchClientPhone.trim()})`
-                    : 'Send on WhatsApp'}
-                </span>
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── SLIDE DRAWER: PROPERTY COMPLETE DETAILS & INSPECTOR ─── */}
-      {viewingProperty && (() => {
-        const allPhotos = [
-          viewingProperty.coverImage,
-          ...(Array.isArray(viewingProperty.images) ? viewingProperty.images : [])
-        ].filter(Boolean);
-
-        const rawPrice = viewingProperty.listingType === 'rent'
-          ? Number(viewingProperty.monthlyRent) || 0
-          : Number(viewingProperty.salePrice) || 0;
-        const netPrice = Number(viewingProperty.netProfit) || 0;
-        const margin = (rawPrice > 0 && netPrice > 0 && rawPrice > netPrice) ? rawPrice - netPrice : 0;
-
-        // Parse amenities into chips
-        const amenitiesList = (viewingProperty.amenities || '')
-          .split(/[,|\n]+/)
-          .map((s) => s.trim())
-          .filter(Boolean);
-
-        return (
-          <div
-            className="fixed inset-0 z-50 overflow-hidden bg-slate-950/70 backdrop-blur-xs flex justify-end transition-opacity duration-300 animate-in fade-in"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                setViewingProperty(null);
-                setActivePhotoIdx(0);
-              }
-            }}
-          >
-            <div className="w-full max-w-xl sm:max-w-2xl bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 overflow-hidden transform transition-transform duration-300 ease-out animate-in slide-in-from-right font-['Inter',sans-serif]">
-              {/* Top Drawer Header */}
-              <div className="px-5 py-4 bg-white border-b border-slate-200 flex items-start justify-between gap-4 sticky top-0 z-20 shadow-2xs">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                    <span className="px-2.5 py-0.5 rounded-md bg-orange-600 text-white text-[10px] font-black uppercase tracking-wide shadow-2xs">
-                      {viewingProperty.configuration || '2 BHK'}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-100 text-[10px] font-bold uppercase">
-                      {viewingProperty.propertyCategory || 'Flat'}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                        viewingProperty.listingType === 'rent'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}
-                    >
-                      {viewingProperty.listingType === 'rent' ? 'For Rent' : 'For Sale'}
-                    </span>
-                    {viewingProperty.dealStatus && (
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                          viewingProperty.dealStatus === 'available'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {viewingProperty.dealStatus}
-                      </span>
-                    )}
-                    {viewingProperty.isVerified !== false && (
-                      <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold flex items-center gap-1">
-                        <i className="ri-verified-badge-fill text-sky-500 text-xs" /> Verified Listing
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug truncate">
-                    {viewingProperty.title || `${viewingProperty.configuration} in ${viewingProperty.location || 'Delhi NCR'}`}
-                  </h2>
-                  <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                    <i className="ri-map-pin-2-fill text-orange-500 text-sm" />
-                    <span className="font-semibold text-slate-700 truncate">{viewingProperty.location || 'Location Not Specified'}</span>
-                    {viewingProperty.sizeSqft && (
-                      <>
-                        <span className="text-slate-300">•</span>
-                        <span className="font-bold text-slate-600">{viewingProperty.sizeSqft}</span>
-                      </>
-                    )}
-                  </p>
-                </div>
-
-                {/* Close Button */}
-                <button
-                  type="button"
-                  onClick={() => { setViewingProperty(null); setActivePhotoIdx(0); }}
-                  className="h-9 w-9 rounded-full bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200 hover:border-red-200"
-                  title="Close Drawer"
-                >
-                  <i className="ri-close-line text-xl" />
-                </button>
-              </div>
-
-              {/* Scrollable Drawer Content */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-slate-50/60">
-                {/* 1. Photo Showcase & Carousel */}
-                <div className="space-y-2.5">
-                  {allPhotos.length > 0 ? (
-                    <div className="space-y-2">
-                      <div className="relative h-64 sm:h-72 w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 shadow-md group">
-                        <img
-                          src={allPhotos[activePhotoIdx] || allPhotos[0]}
-                          alt="Property Showcase"
-                          className="h-full w-full object-contain sm:object-cover transition duration-300"
-                        />
-                        <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                          <span className="px-2.5 py-1 rounded-lg bg-black/75 text-white font-mono text-[11px] font-bold backdrop-blur-md shadow-sm">
-                            Photo {activePhotoIdx + 1} of {allPhotos.length}
-                          </span>
-                        </div>
-                        <div className="absolute top-3 right-3">
-                          <span className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 text-white text-sm font-black shadow-lg">
-                            {priceLabel(viewingProperty)}
-                          </span>
-                        </div>
-
-                        {allPhotos.length > 1 && (
-                          <div className="absolute inset-y-0 inset-x-2 flex items-center justify-between pointer-events-none">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActivePhotoIdx((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1));
-                              }}
-                              className="pointer-events-auto h-8 w-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-xs transition cursor-pointer shadow-md"
-                            >
-                              <i className="ri-arrow-left-s-line text-lg" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActivePhotoIdx((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0));
-                              }}
-                              className="pointer-events-auto h-8 w-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-xs transition cursor-pointer shadow-md"
-                            >
-                              <i className="ri-arrow-right-s-line text-lg" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Thumbnail selector */}
-                      {allPhotos.length > 1 && (
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
-                          {allPhotos.map((img, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => setActivePhotoIdx(idx)}
-                              className={`relative h-14 w-16 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${
-                                activePhotoIdx === idx
-                                  ? 'border-orange-600 ring-2 ring-orange-300 scale-105'
-                                  : 'border-slate-200 opacity-60 hover:opacity-100'
-                              }`}
-                            >
-                              <img src={img} alt="" className="h-full w-full object-cover" />
-                              <span className="absolute bottom-0 right-0 px-1 rounded-tl bg-black/70 text-white text-[8px] font-bold">
-                                #{idx + 1}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="h-36 w-full rounded-2xl bg-gradient-to-br from-white to-orange-50/50 border border-dashed border-orange-200 flex flex-col items-center justify-center text-slate-400 gap-2 shadow-2xs">
-                      <div className="h-10 w-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-xl shadow-xs">
-                        <i className="ri-image-add-line" />
-                      </div>
-                      <div className="text-center">
-                        <span className="text-xs font-bold text-slate-700 block">No Property Photos Attached</span>
-                        <span className="text-[11px] text-slate-400 block">Edit listing to add verified high-res site photos</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Video Walkthrough Banner (if attached) */}
-                {viewingProperty.videoUrl && (
-                  <div className="p-3 bg-gradient-to-r from-red-50 via-rose-50 to-orange-50 rounded-2xl border border-red-200 flex items-center justify-between gap-3 shadow-2xs">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="h-9 w-9 rounded-xl bg-red-600 text-white flex items-center justify-center text-lg shrink-0 shadow-xs">
-                        <i className="ri-youtube-fill" />
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-xs font-black text-slate-900 block truncate">
-                          Video Walkthrough Available
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-medium block truncate">
-                          {viewingProperty.videoUrl}
-                        </span>
-                      </div>
-                    </div>
-                    <a
-                      href={viewingProperty.videoUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shrink-0 flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-                    >
-                      <i className="ri-play-fill" /> Watch Video
-                    </a>
-                  </div>
-                )}
-
-                {/* 2. Financial Overview Grid */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <i className="ri-money-rupee-circle-line text-emerald-600 text-base" /> Pricing & Financial Terms
-                    </h4>
-                    {margin > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black">
-                        Direct Margin: {formatINR(margin)}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Demand Price</span>
-                      <span className="text-base font-black text-emerald-700 block mt-0.5">{priceLabel(viewingProperty)}</span>
-                    </div>
-
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Net Deal / Bottom</span>
-                      <span className="text-base font-black text-amber-700 block mt-0.5">
-                        {netPrice > 0 ? formatINR(netPrice) : 'Firm Demand'}
-                      </span>
-                    </div>
-
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 col-span-2 sm:col-span-1">
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Commission / Brokerage</span>
-                      <span className="text-xs font-bold text-slate-800 block mt-1">
-                        {viewingProperty.commission || (viewingProperty.listingType === 'rent' ? '15 Days Rent' : '1% Deal')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Complete Specifications Grid */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-3">
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <i className="ri-list-check-3 text-orange-600 text-base" /> Full Property Specifications
-                  </h4>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Size & Super Area</span>
-                      <span className="font-extrabold text-slate-800 block mt-0.5">{viewingProperty.sizeSqft || '50 Gaj (450 sq.ft)'}</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Floor & Position</span>
-                      <span className="font-extrabold text-slate-800 block mt-0.5">{viewingProperty.floor || '1st Floor (Front Side)'}</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Lift Facility</span>
-                      <span className={`font-extrabold block mt-0.5 ${viewingProperty.lift === 'YES' ? 'text-emerald-700' : 'text-slate-700'}`}>
-                        {viewingProperty.lift === 'YES' ? '🛗 Lift Installed' : 'No Lift'}
-                      </span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Parking Space</span>
-                      <span className="font-extrabold text-slate-800 block mt-0.5">{viewingProperty.parking || 'Car + Bike Parking'}</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Furnishing</span>
-                      <span className="font-extrabold text-slate-800 block mt-0.5">{viewingProperty.furnishingStatus || 'Semi-Furnished'}</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/80">
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Possession Status</span>
-                      <span className="font-extrabold text-slate-800 block mt-0.5">{viewingProperty.possessionStatus || 'Ready to Move'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. Address & Landmark */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <i className="ri-map-pin-range-line text-blue-600 text-base" /> Complete Address & Landmark
-                    </h4>
-                    {viewingProperty.completeAddress && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard?.writeText(viewingProperty.completeAddress);
-                          setStatus?.('✓ Address copied to clipboard!');
-                        }}
-                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
-                      >
-                        <i className="ri-file-copy-line" /> Copy Address
-                      </button>
-                    )}
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs font-semibold text-slate-700 leading-relaxed">
-                    {viewingProperty.completeAddress || `${viewingProperty.location || 'Local area'}, Delhi NCR`}
-                  </div>
-                </div>
-
-                {/* 5. Sourced Associate / Builder / Owner Contact */}
-                <div className="bg-gradient-to-br from-orange-50/80 via-amber-50/40 to-white p-4 rounded-2xl border border-orange-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-orange-700 font-black uppercase tracking-wider flex items-center gap-1.5">
-                      <i className="ri-user-shared-line text-base text-orange-600" /> Sourced Associate / Builder
-                    </span>
-                    <span className="px-2 py-0.5 rounded-md bg-orange-100 text-orange-800 text-[10px] font-black uppercase">
-                      {viewingProperty.sourcedBy || viewingProperty.source || 'Direct Source'}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-orange-100">
-                    <div>
-                      <h5 className="text-sm font-black text-slate-900">
-                        {viewingProperty.ownerName || 'Associate / Builder'}
-                      </h5>
-                      <p className="text-xs text-slate-500 font-mono mt-0.5 font-bold">
-                        {viewingProperty.ownerContact ? `+91 ${viewingProperty.ownerContact}` : 'Direct Office Inventory'}
-                      </p>
-                    </div>
-
-                    {viewingProperty.ownerContact && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        <a
-                          href={`https://wa.me/91${String(viewingProperty.ownerContact).replace(/[^\d]/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
-                        >
-                          <i className="ri-whatsapp-fill text-sm" /> WhatsApp
-                        </a>
-                        <a
-                          href={`tel:${String(viewingProperty.ownerContact).replace(/[^\d]/g, '')}`}
-                          className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
-                        >
-                          <i className="ri-phone-fill text-sm" /> Call
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 6. Amenities & Features */}
-                {amenitiesList.length > 0 && (
-                  <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-2.5">
-                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <i className="ri-sparkling-fill text-amber-500 text-base" /> Amenities & Colony Features
-                    </h4>
-                    <div className="flex flex-wrap gap-1.5">
-                      {amenitiesList.map((item, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-800 text-[11px] font-bold flex items-center gap-1.5 border border-slate-200/60"
-                        >
-                          <i className="ri-checkbox-circle-fill text-emerald-600 text-xs" /> {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 7. Additional Notes / Descriptions */}
-                {(viewingProperty.notes || viewingProperty.description) && (
-                  <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-1.5">
-                    <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <i className="ri-sticky-note-line text-slate-600 text-base" /> Internal Notes & Highlights
-                    </h4>
-                    <p className="text-xs text-slate-600 leading-relaxed font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      {viewingProperty.notes || viewingProperty.description}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Sticky Footer Action Bar */}
-              <div className="p-4 bg-white border-t border-slate-200 flex items-center gap-2.5 shadow-lg shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const target = viewingProperty;
-                    setViewingProperty(null);
-                    setActivePhotoIdx(0);
-                    startEdit(target);
-                  }}
-                  className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md hover:shadow-lg"
-                >
-                  <i className="ri-edit-line text-base" />
-                  <span>Edit Listing</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const target = viewingProperty;
-                    setViewingProperty(null);
-                    setActivePhotoIdx(0);
-                    setPitchingProperty(target);
-                    setPitchClientName('');
-                  }}
-                  className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md hover:shadow-lg"
-                >
-                  <i className="ri-whatsapp-fill text-base" />
-                  <span>WhatsApp Pitch</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setViewingProperty(null); setActivePhotoIdx(0); }}
-                  className="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black transition cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
+      <PropertyDetailsDrawer
+        property={viewingProperty}
+        onClose={() => setViewingProperty(null)}
+        onPitch={(item) => { setViewingProperty(null); setPitchingProperty(item); }}
+        onEdit={startEdit}
+        onToggleDealStatus={toggleDealStatus}
+      />
     </div>
   );
 }

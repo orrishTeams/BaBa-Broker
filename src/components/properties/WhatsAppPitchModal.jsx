@@ -65,13 +65,20 @@ export default function WhatsAppPitchModal({
           </div>
 
           <div>
-            <label className="text-[11px] font-bold text-slate-700 block mb-1">Client Phone Number (WhatsApp)</label>
+            <label className="text-[11px] font-bold text-slate-700 block mb-1">
+              Client Phone Number (WhatsApp) <span className="text-slate-400 font-normal">(10 digits)</span>
+            </label>
             <div className="relative">
               <i className="ri-phone-fill absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 text-xs" />
               <input
-                type="text"
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
                 value={pitchClientPhone}
-                onChange={(e) => setPitchClientPhone(e.target.value)}
+                onChange={(e) => {
+                  const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setPitchClientPhone(onlyDigits);
+                }}
                 placeholder="e.g. 9876543210"
                 className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 outline-none text-xs font-mono font-bold text-emerald-800"
               />

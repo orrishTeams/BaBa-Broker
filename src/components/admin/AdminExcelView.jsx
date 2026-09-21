@@ -846,12 +846,19 @@ export default function AdminExcelView() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Contact Phone Number</label>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    Contact Phone Number <span className="text-slate-400 font-normal">(10 digits)</span>
+                  </label>
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     value={editingListing.ownerContact || ''}
-                    onChange={(e) => setEditingListing({ ...editingListing, ownerContact: e.target.value })}
-                    placeholder="e.g. 9560587733"
+                    onChange={(e) => {
+                      const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setEditingListing({ ...editingListing, ownerContact: onlyDigits });
+                    }}
+                    placeholder="e.g. 9876543210"
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 outline-none font-medium font-mono"
                   />
                 </div>

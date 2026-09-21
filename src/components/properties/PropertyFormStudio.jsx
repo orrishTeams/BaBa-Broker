@@ -996,12 +996,19 @@ export default function PropertyFormStudio({
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Contact Phone</label>
+                <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                  Contact Phone <span className="text-slate-400 font-normal">(10 digits)</span>
+                </label>
                 <input
-                  type="text"
-                  value={form.ownerContact}
-                  onChange={(e) => setForm({ ...form, ownerContact: e.target.value })}
-                  placeholder="e.g. 9560587733"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={form.ownerContact || ''}
+                  onChange={(e) => {
+                    const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setForm({ ...form, ownerContact: onlyDigits });
+                  }}
+                  placeholder="e.g. 9876543210"
                   className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-orange-500 outline-none font-mono text-xs"
                 />
               </div>

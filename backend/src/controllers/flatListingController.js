@@ -39,8 +39,9 @@ const listingData = (input) => ({
 
   ownerName: String(input.ownerName || '').trim(),
   ownerContact: String(input.ownerContact || '').trim(),
-  propertyCategory: ['RK', 'HK', 'Office', 'Shop', 'Plot'].includes(input.propertyCategory) ? input.propertyCategory : 'HK',
-  furnishingStatus: ['Furnished', 'Unfurnished', 'Semi-Furnished'].includes(input.furnishingStatus) ? input.furnishingStatus : 'Unfurnished',
+  propertyCategory: String(input.propertyCategory || 'Flat').trim(),
+  commercialSubType: String(input.commercialSubType || '').trim(),
+  furnishingStatus: String(input.furnishingStatus || 'Unfurnished').trim(),
   completeAddress: String(input.completeAddress || '').trim(),
   latitude: String(input.latitude || '').trim(),
   longitude: String(input.longitude || '').trim(),

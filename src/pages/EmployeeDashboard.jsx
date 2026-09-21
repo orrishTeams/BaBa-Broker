@@ -5,6 +5,7 @@ import { getAuth, clearAuth } from '../store/auth';
 import { useAppDispatch } from '../store';
 import AssignedLeadsPanel from '../components/AssignedLeadsPanel';
 import AdminExcelView from '../components/admin/AdminExcelView';
+import PageHeader from '../components/common/PageHeader';
 
 const formatINR = (val) => {
   const num = Number(val);
@@ -482,6 +483,9 @@ export default function EmployeeDashboard() {
     const priceText = priceLabel(listing);
     const liftText = listing.lift === 'YES' ? '🛗 Lift Available' : 'No Lift';
     const parkText = listing.parking && listing.parking !== 'No Parking' ? `🚗 ${listing.parking}` : 'No Dedicated Parking';
+    const videoSnippet = listing.videoUrl?.trim()
+      ? `🎥 *Video Walkthrough (YouTube / Video Tour)*:\n${listing.videoUrl.trim()}\n\n`
+      : '';
 
     return (
       `${greeting}🏠 *Quick Property Alert from Baba Broker*\n\n` +
@@ -490,6 +494,7 @@ export default function EmployeeDashboard() {
       `📐 *Size*: ${listing.sizeSqft || '50 Gaj'}\n` +
       `🏢 *Floor & Lift*: ${listing.floor || 'Standard'} | ${liftText}\n` +
       `🚗 *Parking*: ${parkText}\n\n` +
+      videoSnippet +
       `Let me know if you would like to visit today!\n` +
       `- *${employeeName}*, Baba Broker Operations`
     );
@@ -710,21 +715,20 @@ export default function EmployeeDashboard() {
             {view === 'overview' && (
               <div className="space-y-3 w-full">
                 
-                {/* 1. Clean Executive Header Banner */}
-                <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-2xs">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                {/* 1. Compact Executive Header Banner */}
+                <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                          Operations Command Center · Unit Audits & Quality
+                        <h1 className="text-sm sm:text-base font-black tracking-tight text-slate-900">
+                          Welcome back, <span className="text-orange-600">{employeeName}</span> 👋
+                        </h1>
+                        <span className="px-2 py-0.2 rounded-full bg-orange-50 text-orange-700 text-[9.5px] font-black uppercase tracking-wider border border-orange-200 shrink-0">
+                          Operations Command
                         </span>
                       </div>
-                      <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 mt-1">
-                        Welcome back, <span className="text-orange-600">{employeeName}</span> 👋
-                      </h1>
-                      <p className="text-xs text-slate-500 font-medium mt-0.5">
-                        Audit verified inventory, inspect documents & RERA compliance, and monitor live inquiries.
+                      <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                        Audit verified inventory, inspect documents &amp; compliance, and monitor live inquiries.
                       </p>
                     </div>
 
@@ -732,14 +736,14 @@ export default function EmployeeDashboard() {
                       <button
                         type="button"
                         onClick={() => { setForm(emptyFlatListing()); setEditingId(null); setView('add'); }}
-                        className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
                       >
                         <i className="ri-add-line text-sm" /> Add Property
                       </button>
                       <button
                         type="button"
                         onClick={() => setView('leads')}
-                        className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition border border-slate-200 flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition border border-slate-200 flex items-center gap-1.5 cursor-pointer"
                       >
                         <i className="ri-user-star-line text-sm text-amber-600" /> Inquiries
                       </button>
@@ -747,72 +751,71 @@ export default function EmployeeDashboard() {
                   </div>
                 </div>
 
-                {/* 2. Key Metrics Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full">
-                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Inventory</span>
-                      <div className="h-6 w-6 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center text-xs">
+                {/* 2. Compact Key Metrics Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 w-full">
+                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-2xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">Total Inventory</span>
+                      <div className="h-5.5 w-5.5 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center text-xs">
                         <i className="ri-building-line" />
                       </div>
                     </div>
-                    <div className="text-base sm:text-lg font-black text-slate-900">{stats.total} Units</div>
-                    <span className="text-[10px] text-slate-400 font-medium">{stats.available} Available Units</span>
+                    <div className="text-sm sm:text-base font-black text-slate-900">{stats.total} Units</div>
+                    <span className="text-[9.5px] text-slate-400 font-medium">{stats.available} Available Units</span>
                   </div>
 
-                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Buy Deals</span>
-                      <div className="h-6 w-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
+                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-2xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">Buy Deals</span>
+                      <div className="h-5.5 w-5.5 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
                         <i className="ri-price-tag-3-line" />
                       </div>
                     </div>
-                    <div className="text-base sm:text-lg font-black text-blue-700">{stats.buyCount} Properties</div>
-                    <span className="text-[10px] text-blue-600 font-bold">{stats.availableBuy} Active for Sale</span>
+                    <div className="text-sm sm:text-base font-black text-blue-700">{stats.buyCount} Properties</div>
+                    <span className="text-[9.5px] text-blue-600 font-bold">{stats.availableBuy} Active for Sale</span>
                   </div>
 
-                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Rental Units</span>
-                      <div className="h-6 w-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
+                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-2xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">Rental Units</span>
+                      <div className="h-5.5 w-5.5 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
                         <i className="ri-key-2-line" />
                       </div>
                     </div>
-                    <div className="text-base sm:text-lg font-black text-emerald-700">{stats.rentCount} Rentals</div>
-                    <span className="text-[10px] text-emerald-600 font-bold">{stats.availableRent} Active for Rent</span>
+                    <div className="text-sm sm:text-base font-black text-emerald-700">{stats.rentCount} Rentals</div>
+                    <span className="text-[9.5px] text-emerald-600 font-bold">{stats.availableRent} Active for Rent</span>
                   </div>
 
-                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Deals Converted</span>
-                      <div className="h-6 w-6 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-xs">
+                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-2xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">Deals Converted</span>
+                      <div className="h-5.5 w-5.5 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-xs">
                         <i className="ri-medal-line" />
                       </div>
                     </div>
-                    <div className="text-base sm:text-lg font-black text-purple-700">{stats.converted} Deals</div>
-                    <span className="text-[10px] text-purple-600 font-bold">{stats.verified} Verified Units</span>
+                    <div className="text-sm sm:text-base font-black text-purple-700">{stats.converted} Deals</div>
+                    <span className="text-[9.5px] text-purple-600 font-bold">{stats.verified} Verified Units</span>
                   </div>
                 </div>
 
                 {/* 3. Recent Inventory Live Table */}
                 <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2.5 w-full">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Audited Property Inventory</h3>
-                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-extrabold font-mono">
-                          {listings.length} Units
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setView('list')}
-                        className="text-[11px] font-black text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer hover:underline"
-                      >
-                        <span>View Full Inventory ({listings.length})</span>
-                        <i className="ri-arrow-right-line" />
-                      </button>
-                    </div>
+                    <PageHeader
+                      icon="ri-time-line"
+                      title="Audited Property Inventory"
+                      badge={`${listings.length} Units`}
+                      subtitle="Your latest audited and verified properties ready for client pitching"
+                      rightContent={
+                        <button
+                          type="button"
+                          onClick={() => setView('list')}
+                          className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>View Full Inventory ({listings.length})</span>
+                          <i className="ri-arrow-right-line" />
+                        </button>
+                      }
+                    />
 
                     <div className="overflow-x-auto rounded-xl border border-slate-200/90 max-h-[60vh] overflow-y-auto bg-white shadow-2xs">
                       <table className="w-full text-left text-xs border-collapse select-none">
@@ -1001,50 +1004,42 @@ export default function EmployeeDashboard() {
               <form onSubmit={handleSaveListing} className="space-y-4 w-full pb-10">
                 
                 {/* 1. Header Banner */}
-                <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-2xs flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center text-lg font-black shadow-md shadow-orange-500/20">
-                      <i className={editingId ? "ri-edit-2-line" : "ri-building-line"} />
-                    </div>
-                    <div>
+                <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-2xs">
+                  <PageHeader
+                    icon={editingId ? 'ri-edit-2-line' : 'ri-building-line'}
+                    title={editingId ? 'Edit Audited Property' : 'Onboard & Audit New Property'}
+                    badge={form.listingType === 'rent' ? 'Rental' : 'Sale Deal'}
+                    subtitle="Verify property specs, pricing metrics, and photo gallery"
+                    className="pb-0 border-b-0"
+                    rightContent={
                       <div className="flex items-center gap-2">
-                        <h2 className="text-sm sm:text-base font-black text-slate-900">
-                          {editingId ? 'Edit Audited Property' : 'Onboard & Audit New Property'}
-                        </h2>
-                        <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 text-[10px] font-black uppercase border border-orange-200">
-                          {form.listingType === 'rent' ? 'Rental' : 'Sale Deal'}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setForm(emptyFlatListing()); setEditingId(null); setView('list'); }}
+                          className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={saving}
+                          className="px-4 py-1.5 rounded-xl bg-[#ea580c] hover:bg-orange-700 text-white text-xs font-black shadow-md shadow-orange-600/20 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
+                        >
+                          {saving ? (
+                            <>
+                              <i className="ri-loader-4-line text-sm font-black animate-spin" />
+                              <span>{editingId ? 'Saving...' : 'Publishing...'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <i className="ri-check-line text-sm font-black" />
+                              <span>{editingId ? 'Save Changes' : 'Publish Property'}</span>
+                            </>
+                          )}
+                        </button>
                       </div>
-                      <p className="text-[11px] text-slate-400 font-medium">Verify property specs, pricing metrics, and photo gallery</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { setForm(emptyFlatListing()); setEditingId(null); setView('list'); }}
-                      className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="px-5 py-2 rounded-xl bg-[#ea580c] hover:bg-orange-700 text-white text-xs font-black shadow-md shadow-orange-600/20 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
-                    >
-                      {saving ? (
-                        <>
-                          <i className="ri-loader-4-line text-sm font-black animate-spin" />
-                          <span>{editingId ? 'Saving...' : 'Publishing...'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <i className="ri-check-line text-sm font-black" />
-                          <span>{editingId ? 'Save Changes' : 'Publish Property'}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                    }
+                  />
                 </div>
 
                 {/* 2. Real-Time Live Audit Preview Card */}
@@ -1102,28 +1097,41 @@ export default function EmployeeDashboard() {
                     <span className="text-[10px] font-bold text-slate-400">Step 1 of 4</span>
                   </div>
 
-                  {/* Deal Intent & 3 Main Category Chips */}
+                  {/* Deal Intent & Category Selection (Light Orange Theme) */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 text-xs">
-                    {/* Deal Intent (4 cols) */}
-                    <div className="lg:col-span-4 p-2.5 rounded-xl bg-slate-900 text-white border border-slate-800 space-y-1.5 shadow-sm">
+                    
+                    {/* Deal Type Switcher (Light Orange Executive Box) */}
+                    <div className="lg:col-span-5 p-3 rounded-2xl bg-gradient-to-br from-orange-50/90 via-amber-50/50 to-orange-100/50 border border-orange-200/90 shadow-2xs space-y-2">
                       <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1">
-                          <i className="ri-fire-fill text-orange-400 text-xs" />
+                        <label className="text-[11px] font-black text-orange-950 uppercase tracking-wider flex items-center gap-1.5">
+                          <i className="ri-fire-fill text-orange-600 text-xs" />
                           Deal Intent
                         </label>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                          Active: <strong className={form.listingType === 'buy' ? 'text-amber-400' : 'text-cyan-400'}>{form.listingType === 'buy' ? 'For Sale' : 'For Rent'}</strong>
+                        <span className={`text-[9.5px] font-black px-2 py-0.5 rounded-md border uppercase shadow-2xs ${
+                          form.listingType === 'buy'
+                            ? 'bg-orange-100 text-orange-900 border-orange-300'
+                            : 'bg-cyan-100 text-cyan-900 border-cyan-300'
+                        }`}>
+                          Active: {form.listingType === 'buy' ? 'For Sale' : 'For Rent'}
                         </span>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
-                          onClick={() => setForm({ ...form, listingType: 'buy' })}
-                          className={`py-2 px-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          onClick={() => {
+                            setForm({
+                              ...form,
+                              listingType: 'buy',
+                              propertyCategory: 'Flat',
+                              configuration: form.configuration?.includes('BHK') || form.configuration === '1 RK' || form.configuration === 'Jad se' ? form.configuration : '2 BHK',
+                              sizeSqft: form.sizeSqft?.includes('Gaj') ? form.sizeSqft : '50 Gaj (450 sq.ft)',
+                            });
+                          }}
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                             form.listingType === 'buy'
-                              ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 border-white shadow-md font-black scale-[1.02]'
-                              : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                              ? 'bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white border-orange-600 shadow-md shadow-orange-500/30 font-black scale-[1.02] ring-2 ring-orange-400/40'
+                              : 'bg-white/90 text-slate-700 border-slate-200 hover:bg-white hover:text-orange-950 shadow-2xs'
                           }`}
                         >
                           <i className="ri-price-tag-3-fill text-xs" />
@@ -1133,10 +1141,10 @@ export default function EmployeeDashboard() {
                         <button
                           type="button"
                           onClick={() => setForm({ ...form, listingType: 'rent' })}
-                          className={`py-2 px-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                             form.listingType === 'rent'
-                              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-white shadow-md font-black scale-[1.02]'
-                              : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                              ? 'bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 text-white border-blue-500 shadow-md shadow-blue-500/30 font-black scale-[1.02] ring-2 ring-blue-400/40'
+                              : 'bg-white/90 text-slate-700 border-slate-200 hover:bg-white hover:text-blue-950 shadow-2xs'
                           }`}
                         >
                           <i className="ri-key-2-fill text-xs" />
@@ -1145,99 +1153,106 @@ export default function EmployeeDashboard() {
                       </div>
                     </div>
 
-                    {/* 3 Main Categories: Flat, Commercial, Plot (8 cols) */}
-                    <div className="lg:col-span-8 p-2.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-1.5">
+                    {/* Category Selection (7 Cols) */}
+                    <div className="lg:col-span-7 p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-2">
                       <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                        <label className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                           <i className="ri-layout-grid-fill text-orange-600 text-xs" />
-                          Select Property Category <span className="text-orange-600">*</span>
+                          {form.listingType === 'rent' ? 'Rental Property Category' : 'Sale Property Category'}
                         </label>
-                        <span className="text-[9px] font-bold text-slate-400">
-                          3 Primary Types
+                        <span className="text-[9.5px] font-bold text-slate-400">
+                          {form.listingType === 'rent' ? '2 Options Available' : 'Flat Inventory'}
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
-                        {/* 1. FLAT */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setForm({
-                              ...form,
-                              propertyCategory: 'Flat',
-                              configuration: form.configuration?.includes('BHK') || form.configuration === '1 RK' || form.configuration === 'Jad se' ? form.configuration : '2 BHK',
-                              sizeSqft: form.sizeSqft?.includes('Gaj') ? form.sizeSqft : '50 Gaj (450 sq.ft)',
-                            });
-                          }}
-                          className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
-                            (form.propertyCategory === 'Flat' || form.propertyCategory === 'HK' || form.propertyCategory === 'RK' || (!form.propertyCategory && form.propertyCategory !== 'Commercial' && form.propertyCategory !== 'Plot' && form.propertyCategory !== 'Office' && form.propertyCategory !== 'Shop'))
-                              ? 'bg-gradient-to-br from-orange-500/10 to-amber-500/15 border-orange-500 text-orange-950 font-black shadow-xs ring-2 ring-orange-500/30'
-                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
-                          }`}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-base">🏠</span>
-                            <span className="text-xs font-black">Flat</span>
-                          </div>
-                          <span className="text-[9px] text-slate-500 mt-0.5 leading-tight truncate">
-                            Builder Floor / Apt
-                          </span>
-                        </button>
+                      {form.listingType === 'rent' ? (
+                        /* For Rent / Lease: 2 Options (Flat & Commercial) */
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* 1. FLAT */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm({
+                                ...form,
+                                propertyCategory: 'Flat',
+                                configuration: form.configuration?.includes('BHK') || form.configuration === '1 RK' || form.configuration === 'Jad se' ? form.configuration : '2 BHK',
+                                sizeSqft: form.sizeSqft?.includes('Gaj') ? form.sizeSqft : '50 Gaj (450 sq.ft)',
+                              });
+                            }}
+                            className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer flex items-center justify-between ${
+                              (form.propertyCategory === 'Flat' || form.propertyCategory === 'HK' || form.propertyCategory === 'RK' || (!form.propertyCategory && form.propertyCategory !== 'Commercial'))
+                                ? 'bg-gradient-to-br from-orange-500/10 via-amber-500/10 to-orange-50 border-orange-500 text-orange-950 font-black shadow-xs ring-2 ring-orange-500/30'
+                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="h-8 w-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center text-base shrink-0 font-bold">
+                                🏠
+                              </span>
+                              <div>
+                                <span className="block text-xs font-black">Residential Flat</span>
+                                <span className="text-[9.5px] text-slate-500 font-medium">Builder Floors &amp; Units</span>
+                              </div>
+                            </div>
+                            {(form.propertyCategory === 'Flat' || form.propertyCategory === 'HK' || form.propertyCategory === 'RK' || (!form.propertyCategory && form.propertyCategory !== 'Commercial')) && (
+                              <i className="ri-checkbox-circle-fill text-orange-600 text-base" />
+                            )}
+                          </button>
 
-                        {/* 2. COMMERCIAL */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const sub = form.commercialSubType || 'Office';
-                            setForm({
-                              ...form,
-                              propertyCategory: 'Commercial',
-                              commercialSubType: sub,
-                              configuration: sub === 'Office' ? 'Furnished Office' : 'Main Road Shop',
-                              sizeSqft: form.sizeSqft?.includes('sq.ft') ? form.sizeSqft : '500 sq.ft',
-                            });
-                          }}
-                          className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
-                            (form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop')
-                              ? 'bg-gradient-to-br from-blue-500/10 to-indigo-500/15 border-blue-600 text-blue-950 font-black shadow-xs ring-2 ring-blue-500/30'
-                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
-                          }`}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-base">🏢</span>
-                            <span className="text-xs font-black text-blue-900">Commercial</span>
+                          {/* 2. COMMERCIAL */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const sub = form.commercialSubType || 'Office';
+                              setForm({
+                                ...form,
+                                propertyCategory: 'Commercial',
+                                commercialSubType: sub,
+                                configuration: sub === 'Office' ? 'Furnished Office' : 'Main Road Shop',
+                                sizeSqft: form.sizeSqft?.includes('sq.ft') ? form.sizeSqft : '500 sq.ft',
+                              });
+                            }}
+                            className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer flex items-center justify-between ${
+                              (form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop')
+                                ? 'bg-gradient-to-br from-blue-500/10 via-indigo-500/10 to-blue-50 border-blue-600 text-blue-950 font-black shadow-xs ring-2 ring-blue-500/30'
+                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="h-8 w-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-base shrink-0 font-bold">
+                                🏢
+                              </span>
+                              <div>
+                                <span className="block text-xs font-black text-blue-950">Commercial</span>
+                                <span className="text-[9.5px] text-blue-700 font-medium">Office &amp; Retail Shop</span>
+                              </div>
+                            </div>
+                            {(form.propertyCategory === 'Commercial' || form.propertyCategory === 'Office' || form.propertyCategory === 'Shop') && (
+                              <i className="ri-checkbox-circle-fill text-blue-600 text-base" />
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        /* For Sale / Buy: Flat Only */
+                        <div className="p-2.5 rounded-xl bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 border border-orange-200 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="h-8 w-8 rounded-lg bg-orange-500 text-white flex items-center justify-center text-base shrink-0 font-bold shadow-xs">
+                              🏠
+                            </span>
+                            <div>
+                              <span className="block text-xs font-black text-orange-950">
+                                Residential Builder Floor &amp; Flat
+                              </span>
+                              <span className="text-[10px] text-orange-800 font-medium">
+                                Commercial spaces are listed under Rent / Lease.
+                              </span>
+                            </div>
                           </div>
-                          <span className="text-[9px] text-blue-700 font-semibold mt-0.5 leading-tight truncate">
-                            Office &amp; Shop Space
+                          <span className="px-2 py-0.5 rounded bg-orange-600 text-white text-[9px] font-black uppercase tracking-wider shrink-0">
+                            Sale Active
                           </span>
-                        </button>
-
-                        {/* 3. PLOT / LAND */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setForm({
-                              ...form,
-                              propertyCategory: 'Plot',
-                              configuration: 'Residential Plot',
-                              sizeSqft: '100 Gaj (900 sq.ft)',
-                            });
-                          }}
-                          className={`p-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
-                            form.propertyCategory === 'Plot' || form.propertyCategory === 'Land'
-                              ? 'bg-gradient-to-br from-emerald-500/10 to-teal-500/15 border-emerald-600 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-500/30'
-                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
-                          }`}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-base">📐</span>
-                            <span className="text-xs font-black text-emerald-900">Plot / Land</span>
-                          </div>
-                          <span className="text-[9px] text-emerald-700 font-semibold mt-0.5 leading-tight truncate">
-                            Freehold Land
-                          </span>
-                        </button>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2004,6 +2019,49 @@ export default function EmployeeDashboard() {
                       )}
                     </div>
                   </div>
+
+                  {/* YouTube / Video Walkthrough Tour URL */}
+                  <div className="pt-3 border-t border-slate-100 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                        <i className="ri-youtube-fill text-red-600 text-sm" />
+                        YouTube / Video Walkthrough URL
+                      </label>
+                      {form.videoUrl && (
+                        <a
+                          href={form.videoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] font-bold text-red-600 hover:text-red-700 hover:underline flex items-center gap-1"
+                        >
+                          <i className="ri-external-link-line" /> Test Video Link
+                        </a>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <i className="ri-play-circle-line absolute left-3 top-1/2 -translate-y-1/2 text-red-500 text-sm" />
+                      <input
+                        type="url"
+                        value={form.videoUrl}
+                        onChange={(e) => setForm({ ...form, videoUrl: e.target.value })}
+                        placeholder="e.g. https://youtu.be/... or YouTube walkthrough link"
+                        className="w-full pl-8 pr-8 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-red-500 outline-none text-xs font-medium text-slate-900 shadow-2xs"
+                      />
+                      {form.videoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, videoUrl: '' })}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm cursor-pointer"
+                          title="Clear video URL"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-400 block">
+                      🎥 Video link is automatically attached to WhatsApp client pitch messages when shared by employees!
+                    </span>
+                  </div>
                 </div>
 
                 {/* 5. Bottom Action Bar */}
@@ -2043,57 +2101,47 @@ export default function EmployeeDashboard() {
               <div className="bg-white p-3 sm:p-4 rounded-3xl border border-slate-200/90 shadow-xs space-y-3.5 w-full">
                 
                 {/* 1. Page Heading Header with Live Search Bar & Action Buttons */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-10 w-10 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-lg font-black shrink-0 shadow-2xs">
-                      <i className="ri-building-line" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">Property Inventory & Audit Catalog</h2>
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200/60">
-                          {filteredListings.length} Units
-                        </span>
+                <PageHeader
+                  icon="ri-building-line"
+                  title="Property Inventory & Audit Catalog"
+                  badge={`${filteredListings.length} Units`}
+                  subtitle="Manage audited properties • Excel Import & Live Management"
+                  rightContent={
+                    <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+                      {/* Upload Fresh Excel Button */}
+                      <button
+                        type="button"
+                        onClick={() => setShowExcelModal(true)}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0"
+                        title="Upload fresh Excel sheet to populate inventory"
+                      >
+                        <i className="ri-file-excel-2-fill text-sm" />
+                        <span>Upload Fresh Excel</span>
+                      </button>
+
+                      {/* Prominent Live Search Bar */}
+                      <div className="relative flex-1 min-w-[180px] sm:w-56 md:flex-initial">
+                        <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+                        <input
+                          type="text"
+                          value={searchVal}
+                          onChange={(e) => { setSearchVal(e.target.value); setCurrentPage(1); }}
+                          placeholder="Search flat, location, owner..."
+                          className="w-full rounded-xl bg-slate-50 hover:bg-slate-100/80 focus:bg-white pl-7 pr-6 py-1 text-xs text-slate-800 placeholder-slate-400 outline-none border border-slate-200 focus:border-orange-500 transition font-medium shadow-2xs"
+                        />
+                        {searchVal && (
+                          <button
+                            type="button"
+                            onClick={() => setSearchVal('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer text-xs"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
-                      <p className="text-xs text-slate-400 font-medium">Manage audited properties • Excel Import & Live Management</p>
                     </div>
-                  </div>
-
-                  {/* Actions & Search */}
-                  <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
-                    {/* Upload Fresh Excel Button */}
-                    <button
-                      type="button"
-                      onClick={() => setShowExcelModal(true)}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0"
-                      title="Upload fresh Excel sheet to populate inventory"
-                    >
-                      <i className="ri-file-excel-2-fill text-sm" />
-                      <span>Upload Fresh Excel</span>
-                    </button>
-
-                    {/* Prominent Live Search Bar */}
-                    <div className="relative flex-1 min-w-[200px] sm:w-64 md:flex-initial">
-                      <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
-                      <input
-                        type="text"
-                        value={searchVal}
-                        onChange={(e) => { setSearchVal(e.target.value); setCurrentPage(1); }}
-                        placeholder="Search flat, location, owner..."
-                        className="w-full rounded-2xl bg-slate-50 hover:bg-slate-100/80 focus:bg-white pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none border border-slate-200 focus:border-orange-500 transition font-medium shadow-2xs"
-                      />
-                      {searchVal && (
-                        <button
-                          type="button"
-                          onClick={() => setSearchVal('')}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          <i className="ri-close-line text-xs" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  }
+                />
 
                 {/* 2. Filter Ribbon with Highlighted Budget Selector on Right Corner */}
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
@@ -2711,13 +2759,13 @@ export default function EmployeeDashboard() {
 
             {/* ─── TAB 4: CLIENT INQUIRIES ─── */}
             {view === 'leads' && (
-              <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-xs space-y-3 w-full">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div>
-                    <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">Client, Buyer & Investment Inquiry Desk</h2>
-                    <p className="text-[11px] text-slate-400">Manage buyer requirements, investor inquiries, site visits, and instant WhatsApp connect</p>
-                  </div>
-                </div>
+              <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-xs space-y-3 w-full">
+                <PageHeader
+                  icon="ri-user-star-line"
+                  title="Client & Buyer Inquiry Desk"
+                  badge="Live Inquiries"
+                  subtitle="Manage buyer requirements, investor inquiries, site visits, and instant WhatsApp connect"
+                />
                 <AssignedLeadsPanel />
               </div>
             )}
@@ -2725,15 +2773,14 @@ export default function EmployeeDashboard() {
             {/* ─── TAB 5: RERA & DOCS CHECKLIST ─── */}
             {view === 'verification' && (
               <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-xs space-y-4 w-full max-w-4xl mx-auto">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                  <div className="h-8 w-8 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base font-black">
-                    <i className="ri-file-shield-line" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-black text-slate-900">RERA & Document Compliance Checklist</h2>
-                    <p className="text-[11px] text-slate-400">Mandatory verification steps before clearing flats for client visits</p>
-                  </div>
-                </div>
+                <PageHeader
+                  icon="ri-file-shield-line"
+                  iconColor="bg-emerald-100 text-emerald-700"
+                  title="RERA & Document Compliance Checklist"
+                  badge="Compliance"
+                  badgeColor="bg-emerald-100 text-emerald-800 border-emerald-200"
+                  subtitle="Mandatory verification steps before clearing flats for client visits"
+                />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 space-y-1.5">
@@ -2781,7 +2828,16 @@ export default function EmployeeDashboard() {
 
             {/* ─── TAB 6: COMMISSION & EMI CALCULATOR ─── */}
             {view === 'calculator' && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 w-full">
+              <div className="space-y-3.5 w-full">
+                <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-xs">
+                  <PageHeader
+                    icon="ri-calculator-line"
+                    title="Financial Deal & EMI Calculators"
+                    subtitle="Compute brokerage commission, customer home loan EMI, and area unit conversions"
+                    badge="Operations Tools"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 w-full">
                 
                 {/* 1. Brokerage Calculator */}
                 <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
@@ -2945,7 +3001,7 @@ export default function EmployeeDashboard() {
                     </div>
                   </div>
                 </div>
-
+              </div>
               </div>
             )}
 
@@ -3224,6 +3280,33 @@ export default function EmployeeDashboard() {
                     </div>
                   )}
                 </div>
+
+                {/* Video Walkthrough Banner (if attached) */}
+                {viewingProperty.videoUrl && (
+                  <div className="p-3 bg-gradient-to-r from-red-50 via-rose-50 to-orange-50 rounded-2xl border border-red-200 flex items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-9 w-9 rounded-xl bg-red-600 text-white flex items-center justify-center text-lg shrink-0 shadow-xs">
+                        <i className="ri-youtube-fill" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs font-black text-slate-900 block truncate">
+                          Video Walkthrough Available
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-medium block truncate">
+                          {viewingProperty.videoUrl}
+                        </span>
+                      </div>
+                    </div>
+                    <a
+                      href={viewingProperty.videoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shrink-0 flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                    >
+                      <i className="ri-play-fill" /> Watch Video
+                    </a>
+                  </div>
+                )}
 
                 {/* 2. Financial Overview Grid */}
                 <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-3">

@@ -32,10 +32,10 @@ const flatListingSchema = new mongoose.Schema(
     pricePerSqft: { type: Number, default: 0 },
     priceNegotiable: { type: Boolean, default: false },
 
-    // Primary Owner & Property Specifications
     ownerName: { type: String, trim: true, default: '' },
     ownerContact: { type: String, trim: true, default: '' },
-    propertyCategory: { type: String, default: 'HK' },
+    propertyCategory: { type: String, default: 'Flat' },
+    commercialSubType: { type: String, default: '' },
     furnishingStatus: { type: String, default: '' },
     completeAddress: { type: String, trim: true, default: '' },
     latitude: { type: String, trim: true, default: '' },

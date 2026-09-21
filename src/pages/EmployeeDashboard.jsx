@@ -2,7 +2,6 @@ import React from 'react';
 import { useEmployeeDashboard } from '../hooks/useEmployeeDashboard';
 
 // Reusable Presentation Components
-import PageHeader from '../components/common/PageHeader';
 import DashboardTopNav from '../components/dashboard/DashboardTopNav';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardMetricsGrid from '../components/dashboard/DashboardMetricsGrid';
@@ -66,321 +65,382 @@ export default function EmployeeDashboard() {
   } = useEmployeeDashboard();
 
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: 'ri-dashboard-3-line' },
-    { id: 'list', label: 'Audited Catalog', icon: 'ri-building-line', badge: stats.total },
-    { id: 'add', label: editingId ? 'Edit Property' : 'Audit & Onboard', icon: 'ri-add-circle-line' },
-    { id: 'excel', label: 'Excel Import', icon: 'ri-file-excel-2-line' },
-    { id: 'leads', label: 'Client Inquiries', icon: 'ri-user-star-line' },
-    { id: 'verification', label: 'Compliance Docs', icon: 'ri-file-shield-line' },
-    { id: 'calculator', label: 'Deal Calculators', icon: 'ri-calculator-line' },
+    { id: 'overview', label: 'Operations Command', icon: 'ri-dashboard-3-line', activeIcon: 'ri-dashboard-3-fill' },
+    { id: 'list', label: 'Company Inventory', icon: 'ri-building-line', activeIcon: 'ri-building-fill' },
+    { id: 'add', label: editingId ? 'Edit Property' : 'Audit & Onboard', icon: 'ri-add-circle-line', activeIcon: 'ri-add-circle-fill' },
+    { id: 'excel', label: 'Excel Import', icon: 'ri-file-excel-2-line', activeIcon: 'ri-file-excel-2-fill' },
+    { id: 'leads', label: 'Assigned Leads', icon: 'ri-user-star-line', activeIcon: 'ri-user-star-fill' },
+    { id: 'compliance', label: 'Operations Audit', icon: 'ri-shield-check-line', activeIcon: 'ri-shield-check-fill' },
+    { id: 'calculator', label: 'Deal Calculator', icon: 'ri-calculator-line', activeIcon: 'ri-calculator-fill' },
   ];
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-slate-100 font-['Inter',sans-serif] text-slate-800 antialiased overflow-hidden select-none">
-      {/* Top Header Navigation */}
-      <DashboardTopNav
-        roleTitle="Operations Desk • Onboarding"
-        roleBadge="Operations Desk"
-        roleBadgeColor="bg-amber-50 text-amber-800 border-amber-200"
-        userName={employeeName}
-        dutyStatus={dutyStatus}
-        onToggleDuty={() => setDutyStatus((d) => (d === 'online' ? 'offline' : 'online'))}
-        onLogout={handleLogout}
-        onToggleMobileSidebar={() => setMobileSidebarOpen((o) => !o)}
-      />
+    <div className="h-screen w-screen bg-[#070e1c] p-1.5 sm:p-2.5 md:p-3 font-['Inter',sans-serif] text-slate-800 antialiased flex flex-col justify-center overflow-hidden select-text">
+      {/* Toast Alert */}
+      {status && (
+        <div className="fixed top-5 right-5 z-50 flex items-center gap-2.5 rounded-2xl border border-emerald-200 bg-white text-emerald-800 shadow-xl px-4 py-2.5 text-xs font-bold animate-in fade-in slide-in-from-top-2">
+          <i className="ri-checkbox-circle-fill text-emerald-600 text-base" />
+          <span>{status}</span>
+          <button
+            type="button"
+            onClick={() => setStatus('')}
+            className="text-slate-400 hover:text-slate-600 ml-2 cursor-pointer"
+          >
+            <i className="ri-close-line text-sm" />
+          </button>
+        </div>
+      )}
 
-      {/* Main Workspace Layout */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar Navigation */}
+      {/* Main Curved App Container */}
+      <div className="w-full h-full rounded-2xl sm:rounded-3xl md:rounded-[36px] shadow-2xl shadow-slate-950/80 overflow-hidden bg-white flex flex-col lg:flex-row border border-slate-800/30 relative">
+        {/* ─── LEFT SOLID ORANGE SIDEBAR ─── */}
         <DashboardSidebar
           view={view}
           setView={setView}
           navItems={navItems}
+          totalCount={stats.total}
+          portalTitle="Operations Desk"
           onSharePortfolio={handleSharePortfolio}
           mobileSidebarOpen={mobileSidebarOpen}
           setMobileSidebarOpen={setMobileSidebarOpen}
         />
 
-        {/* Dynamic Canvas */}
-        <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 overflow-hidden">
-          <main className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3.5">
-            {/* Notification Banner */}
-            {status && (
-              <div className="rounded-xl border border-orange-200 bg-orange-50 px-3.5 py-2 text-xs font-bold text-orange-900 flex items-center justify-between shadow-2xs">
-                <span className="flex items-center gap-1.5">
-                  <i className="ri-information-line text-orange-600 text-sm" /> {status}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setStatus('')}
-                  className="text-orange-400 hover:text-orange-900 cursor-pointer text-sm"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
+        {/* ─── RIGHT CANVAS: FULL WIDTH WORKSPACE ─── */}
+        <div className="flex-1 h-full flex flex-col min-w-0 overflow-hidden bg-white">
+          {/* Header */}
+          <DashboardTopNav
+            userName={employeeName}
+            roleBadge="Operations Team"
+            roleBadgeColor="text-amber-600"
+            roleSubText="Operations Desk • Inventory Auditor"
+            searchVal={searchVal}
+            setSearchVal={setSearchVal}
+            dutyStatus={dutyStatus}
+            onToggleDuty={() => setDutyStatus((d) => (d === 'online' ? 'offline' : 'online'))}
+            onLogout={handleLogout}
+            onToggleMobileSidebar={() => setMobileSidebarOpen((prev) => !prev)}
+          />
 
-            {/* ─── TAB 0: OVERVIEW ─── */}
+          {/* Main Content Workspace (Full Width Container) */}
+          <main className="flex-1 overflow-y-auto p-3 sm:p-5 bg-slate-50/60 space-y-3">
+            {/* ─── TAB 0: OPERATIONS OVERVIEW PAGE ─── */}
             {view === 'overview' && (
               <div className="space-y-3 w-full">
-                {/* Executive Welcome Banner */}
-                <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-sm sm:text-base font-black tracking-tight text-slate-900">
+                {/* 1. Welcome Banner */}
+                <div className="rounded-3xl bg-white text-slate-800 p-4 sm:p-5 shadow-2xs border border-slate-200/90 relative overflow-hidden w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-black uppercase tracking-wider border border-amber-200 flex items-center gap-1">
+                          <i className="ri-shield-star-line text-xs" /> Operations Command Desk Active
+                        </span>
+                        <span className="text-slate-400 text-[11px]">
+                          · {new Date().toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                      <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900">
                         Welcome back, <span className="text-orange-600">{employeeName}</span> 👋
                       </h1>
-                      <span className="px-2 py-0.2 rounded-full bg-orange-50 text-orange-700 text-[9.5px] font-black uppercase tracking-wider border border-orange-200 shrink-0">
-                        Operations Command
-                      </span>
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        Inventory auditing, verification workflows, Excel catalog imports, and salesman assignments.
+                      </p>
                     </div>
-                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                      Audit verified inventory, inspect documents &amp; compliance, and monitor live inquiries.
-                    </p>
-                  </div>
 
-                  <div className="flex items-center gap-2 flex-wrap shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => { setForm(emptyFlatListing()); setEditingId(null); setView('add'); }}
-                      className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <i className="ri-add-line text-sm" /> Add Property
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setView('leads')}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition border border-slate-200 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <i className="ri-user-star-line text-sm text-amber-600" /> Inquiries
-                    </button>
-                  </div>
-                </div>
-
-                {/* 4-Card Metrics Grid */}
-                <DashboardMetricsGrid stats={stats} />
-
-                {/* Recent Inventory Table */}
-                <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-xs space-y-2.5 w-full">
-                  <PageHeader
-                    icon="ri-time-line"
-                    title="Audited Property Inventory"
-                    badge={`${listings.length} Units`}
-                    subtitle="Your latest audited and verified properties ready for client pitching"
-                    rightContent={
+                    <div className="flex items-center gap-2 flex-wrap shrink-0">
                       <button
                         type="button"
-                        onClick={() => setView('list')}
-                        className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer"
+                        onClick={() => {
+                          setForm(emptyFlatListing());
+                          setEditingId(null);
+                          setView('add');
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
                       >
-                        <span>View Full Inventory ({listings.length})</span>
-                        <i className="ri-arrow-right-line" />
+                        <i className="ri-add-line text-sm" /> Audit & Onboard
                       </button>
-                    }
-                  />
-
-                  <PropertyTable
-                    listings={listings.slice(0, 10)}
-                    onViewDetails={(item) => setViewingProperty(item)}
-                    onPitch={(item) => setPitchingProperty(item)}
-                    onEdit={startEdit}
-                    onToggleDealStatus={toggleDealStatus}
-                    onToggleVerification={toggleVerification}
-                    isEmployee={true}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* ─── TAB 1: AUDITED PROPERTY CATALOG ─── */}
-            {view === 'list' && (
-              <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-xs space-y-3 w-full">
-                <PageHeader
-                  icon="ri-building-line"
-                  title="Property Inventory & Audit Catalog"
-                  badge={`${filteredListings.length} Units`}
-                  subtitle="Manage audited properties • Excel Import & Live Management"
-                  rightContent={
-                    <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
                       <button
                         type="button"
                         onClick={() => setView('excel')}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0"
-                        title="Upload fresh Excel sheet to populate inventory"
+                        className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition border border-emerald-200 flex items-center gap-1.5 cursor-pointer"
                       >
-                        <i className="ri-file-excel-2-fill text-sm" />
-                        <span>Upload Fresh Excel</span>
+                        <i className="ri-file-excel-2-line text-sm text-emerald-600" /> Excel Import
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={cleanAllInventory}
-                        className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
-                        title="Delete all listings to start with fresh Excel upload"
-                      >
-                        <i className="ri-delete-bin-2-line text-sm" />
-                        <span>Clean Catalog</span>
-                      </button>
-
-                      <div className="relative flex-1 min-w-[180px] sm:w-56 md:flex-initial">
-                        <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
-                        <input
-                          type="text"
-                          value={searchVal}
-                          onChange={(e) => { setSearchVal(e.target.value); setCurrentPage(1); }}
-                          placeholder="Search flat, location, owner..."
-                          className="w-full rounded-xl bg-slate-50 hover:bg-slate-100/80 focus:bg-white pl-7 pr-6 py-1 text-xs text-slate-800 placeholder-slate-400 outline-none border border-slate-200 focus:border-orange-500 transition font-medium shadow-2xs"
-                        />
-                        {searchVal && (
-                          <button
-                            type="button"
-                            onClick={() => setSearchVal('')}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer text-xs"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  }
-                />
-
-                {/* Filter Ribbon */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 pb-2.5 border-b border-slate-100 text-xs">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200/80">
-                      {[
-                        { id: 'all', label: 'All Units' },
-                        { id: 'Flat', label: '🏠 Flat' },
-                        { id: 'Commercial', label: '🏢 Commercial' },
-                        { id: 'Office', label: '💼 Office' },
-                        { id: 'Shop', label: '🏪 Shop' },
-                      ].map((cat) => (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => { setFilterCategory(cat.id); setCurrentPage(1); }}
-                          className={`px-2 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
-                            filterCategory === cat.id
-                              ? 'bg-orange-600 text-white shadow-2xs'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          {cat.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200/80">
-                      {['all', 'buy', 'rent'].map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => { setFilterType(t); setFilterPrice('all'); setCurrentPage(1); }}
-                          className={`px-2 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
-                            filterType === t
-                              ? 'bg-slate-900 text-white shadow-2xs'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          {t === 'all' ? 'All Deals' : t === 'buy' ? '🏷️ Buy/Sale' : '🔑 Rent'}
-                        </button>
-                      ))}
                     </div>
                   </div>
+                </div>
 
+                {/* 2. Key Metrics Grid */}
+                <DashboardMetricsGrid stats={stats} />
+
+                {/* 3. Quick Actions Toolbar */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setView('excel')}
+                    className="p-3 bg-white rounded-2xl border border-slate-200 hover:border-emerald-300 hover:shadow-xs transition text-left flex items-center justify-between group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-black group-hover:scale-110 transition-transform">
+                        <i className="ri-file-excel-2-fill" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-slate-900">Batch Excel Upload</div>
+                        <div className="text-[10px] text-slate-400">Import hundreds of properties</div>
+                      </div>
+                    </div>
+                    <i className="ri-arrow-right-line text-slate-400 group-hover:text-emerald-600 transition" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setView('compliance')}
+                    className="p-3 bg-white rounded-2xl border border-slate-200 hover:border-blue-300 hover:shadow-xs transition text-left flex items-center justify-between group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-black group-hover:scale-110 transition-transform">
+                        <i className="ri-shield-check-fill" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-slate-900">Operations Checklist</div>
+                        <div className="text-[10px] text-slate-400">RERA & title deed compliance</div>
+                      </div>
+                    </div>
+                    <i className="ri-arrow-right-line text-slate-400 group-hover:text-blue-600 transition" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={cleanAllInventory}
+                    className="p-3 bg-white rounded-2xl border border-slate-200 hover:border-amber-300 hover:shadow-xs transition text-left flex items-center justify-between group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-black group-hover:scale-110 transition-transform">
+                        <i className="ri-magic-line" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-slate-900">Sanitize Catalog</div>
+                        <div className="text-[10px] text-slate-400">Fix invalid prices & missing tags</div>
+                      </div>
+                    </div>
+                    <i className="ri-arrow-right-line text-slate-400 group-hover:text-amber-600 transition" />
+                  </button>
+                </div>
+
+                {/* 4. Recent Property Inventory Table */}
+                <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-2xs space-y-3 w-full">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center font-black text-xs">
+                        <i className="ri-time-line" />
+                      </div>
+                      <div>
+                        <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                          Recent Property Catalog ({listings.length})
+                        </h2>
+                        <p className="text-[11px] text-slate-400">Latest company listings audited by Operations Desk</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setView('list')}
+                      className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>View All</span>
+                      <i className="ri-arrow-right-line text-xs" />
+                    </button>
+                  </div>
+
+                  <PropertyTable
+                    properties={listings.slice(0, 8)}
+                    onView={(item) => setViewingProperty(item)}
+                    onPitch={(item) => setPitchingProperty(item)}
+                    onEdit={(item) => startEdit(item)}
+                    onDelete={(id) => deleteListing(id)}
+                    onToggleDealStatus={(id, currentStatus) => toggleDealStatus(id, currentStatus)}
+                    showVerificationToggle={true}
+                    onToggleVerification={(id, current) => toggleVerification(id, current)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ─── TAB 1: COMPANY INVENTORY CATALOG ─── */}
+            {view === 'list' && (
+              <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-2xs space-y-3.5 w-full">
+                {/* Header & Controls Bar */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div>
+                    <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                      Company Property Catalog ({filteredListings.length})
+                    </h2>
+                    <p className="text-[11px] text-slate-400">
+                      Audit, verify, and assign properties across sales team
+                    </p>
+                  </div>
+
+                  {/* Filter Pills & View Mode */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center gap-1 bg-amber-50 border border-amber-200/80 px-2 py-1 rounded-xl">
-                      <select
-                        value={filterPrice}
-                        onChange={(e) => { setFilterPrice(e.target.value); setCurrentPage(1); }}
-                        className="text-xs font-bold text-amber-950 bg-transparent outline-none cursor-pointer"
-                      >
-                        <option value="all">💰 All Budgets</option>
-                        <option value="u15">Under ₹15 Lakh</option>
-                        <option value="15-25">₹15 L – ₹25 Lakh</option>
-                        <option value="25-40">₹25 L – ₹40 Lakh</option>
-                        <option value="40-60">₹40 L – ₹60 Lakh</option>
-                        <option value="a60">Above ₹60 Lakh</option>
-                      </select>
+                    {/* Category Filter */}
+                    <div className="flex items-center rounded-xl bg-slate-100 p-0.5 text-xs font-bold">
+                      {['all', 'Flat', 'Commercial', 'Plot'].map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setFilterCategory(cat);
+                            setCurrentPage(1);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg transition capitalize cursor-pointer text-xs ${
+                            filterCategory === cat
+                              ? 'bg-white text-orange-600 shadow-2xs font-black'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
                     </div>
 
-                    <div className="inline-flex rounded-xl bg-slate-100 p-0.5 border border-slate-200">
+                    {/* Listing Type Filter */}
+                    <div className="flex items-center rounded-xl bg-slate-100 p-0.5 text-xs font-bold">
+                      {[
+                        { id: 'all', label: 'All' },
+                        { id: 'buy', label: 'Buy/Sale' },
+                        { id: 'rent', label: 'Rent' },
+                      ].map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setFilterType(t.id);
+                            setCurrentPage(1);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-xs ${
+                            filterType === t.id
+                              ? 'bg-white text-orange-600 shadow-2xs font-black'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Price Range */}
+                    <select
+                      value={filterPrice}
+                      onChange={(e) => {
+                        setFilterPrice(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-700 outline-none focus:border-orange-500 cursor-pointer"
+                    >
+                      <option value="all">Any Price</option>
+                      <option value="under20">Under ₹ 20 Lakh</option>
+                      <option value="20to40">₹ 20L - ₹ 40 Lakh</option>
+                      <option value="40to75">₹ 40L - ₹ 75 Lakh</option>
+                      <option value="above75">Above ₹ 75 Lakh</option>
+                    </select>
+
+                    {/* Layout Switcher */}
+                    <div className="flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200">
                       <button
                         type="button"
                         onClick={() => setInventoryViewMode('table')}
-                        className={`px-2 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
-                          inventoryViewMode === 'table' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600'
+                        className={`h-7 w-7 rounded-lg flex items-center justify-center transition cursor-pointer ${
+                          inventoryViewMode === 'table' ? 'bg-white text-orange-600 shadow-2xs font-black' : 'text-slate-400'
                         }`}
+                        title="Table View"
                       >
-                        <i className="ri-table-line" /> Table
+                        <i className="ri-table-line text-sm" />
                       </button>
                       <button
                         type="button"
                         onClick={() => setInventoryViewMode('grid')}
-                        className={`px-2 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
-                          inventoryViewMode === 'grid' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600'
+                        className={`h-7 w-7 rounded-lg flex items-center justify-center transition cursor-pointer ${
+                          inventoryViewMode === 'grid' ? 'bg-white text-orange-600 shadow-2xs font-black' : 'text-slate-400'
                         }`}
+                        title="Grid Cards View"
                       >
-                        <i className="ri-grid-fill" /> Cards
+                        <i className="ri-grid-fill text-sm" />
                       </button>
                     </div>
+
+                    {/* Add New Quick Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm(emptyFlatListing());
+                        setEditingId(null);
+                        setView('add');
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-black transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <i className="ri-add-line text-sm" /> Add New
+                    </button>
                   </div>
                 </div>
 
-                {/* List Body */}
-                {paginatedListings.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400">
-                    <i className="ri-folder-open-line text-4xl mb-2 block text-slate-300" />
-                    <p className="text-xs font-bold text-slate-600">No audited properties found matching filters.</p>
-                  </div>
-                ) : inventoryViewMode === 'grid' ? (
-                  <PropertyGrid
-                    listings={paginatedListings}
-                    onViewDetails={(item) => setViewingProperty(item)}
+                {/* Properties Render */}
+                {inventoryViewMode === 'table' ? (
+                  <PropertyTable
+                    properties={paginatedListings}
+                    onView={(item) => setViewingProperty(item)}
                     onPitch={(item) => setPitchingProperty(item)}
-                    onEdit={startEdit}
-                    onDelete={deleteListing}
-                    onToggleDealStatus={toggleDealStatus}
+                    onEdit={(item) => startEdit(item)}
+                    onDelete={(id) => deleteListing(id)}
+                    onToggleDealStatus={(id, currentStatus) => toggleDealStatus(id, currentStatus)}
+                    showVerificationToggle={true}
+                    onToggleVerification={(id, current) => toggleVerification(id, current)}
                   />
                 ) : (
-                  <PropertyTable
-                    listings={paginatedListings}
-                    currentPage={currentPage}
-                    pageSize={PAGE_SIZE}
-                    onViewDetails={(item) => setViewingProperty(item)}
+                  <PropertyGrid
+                    properties={paginatedListings}
+                    onView={(item) => setViewingProperty(item)}
                     onPitch={(item) => setPitchingProperty(item)}
-                    onEdit={startEdit}
-                    onDelete={deleteListing}
-                    onToggleDealStatus={toggleDealStatus}
-                    onToggleVerification={toggleVerification}
-                    isEmployee={true}
+                    onEdit={(item) => startEdit(item)}
+                    onDelete={(id) => deleteListing(id)}
+                    onToggleDealStatus={(id, currentStatus) => toggleDealStatus(id, currentStatus)}
+                    showVerificationToggle={true}
+                    onToggleVerification={(id, current) => toggleVerification(id, current)}
                   />
                 )}
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                    <span className="text-slate-400 font-medium">
-                      Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredListings.length)} of {filteredListings.length} units
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
+                    <span className="text-slate-400">
+                      Showing {(currentPage - 1) * PAGE_SIZE + 1} -{' '}
+                      {Math.min(currentPage * PAGE_SIZE, filteredListings.length)} of {filteredListings.length}
                     </span>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        disabled={currentPage <= 1}
-                        onClick={() => setCurrentPage((p) => p - 1)}
-                        className="px-2.5 py-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold disabled:opacity-40 cursor-pointer shadow-2xs"
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       >
                         Prev
                       </button>
-                      <span className="px-2 py-0.5 rounded-lg bg-orange-50 text-orange-700 font-black font-mono">
-                        {currentPage} / {totalPages}
-                      </span>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => setCurrentPage(num)}
+                          className={`h-7 w-7 rounded-lg text-xs font-bold transition cursor-pointer ${
+                            currentPage === num
+                              ? 'bg-orange-600 text-white font-black'
+                              : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      ))}
                       <button
                         type="button"
-                        disabled={currentPage >= totalPages}
-                        onClick={() => setCurrentPage((p) => p + 1)}
-                        className="px-2.5 py-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold disabled:opacity-40 cursor-pointer shadow-2xs"
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       >
                         Next
                       </button>
@@ -390,72 +450,78 @@ export default function EmployeeDashboard() {
               </div>
             )}
 
-            {/* ─── TAB 2: AUDIT & ONBOARD FORM STUDIO ─── */}
+            {/* ─── TAB 2: AUDIT & ONBOARD STUDIO ─── */}
             {view === 'add' && (
               <PropertyFormStudio
                 form={form}
                 setForm={setForm}
                 editingId={editingId}
-                setEditingId={setEditingId}
-                onSave={handleSaveListing}
-                onCancel={() => { setForm(emptyFlatListing()); setEditingId(null); setView('list'); }}
                 saving={saving}
-                roleBadge="Operations Audit"
+                onSubmit={handleSaveListing}
+                onCancel={() => {
+                  setForm(emptyFlatListing());
+                  setEditingId(null);
+                  setView('list');
+                }}
               />
             )}
 
-            {/* ─── TAB 3: EXCEL IMPORT & CSV SYNC ─── */}
+            {/* ─── TAB 3: EXCEL IMPORT STUDIO ─── */}
             {view === 'excel' && (
-              <div className="w-full space-y-3">
+              <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-2xs space-y-3 w-full">
                 <AdminExcelView />
               </div>
             )}
 
-            {/* ─── TAB 4: CLIENT INQUIRIES ─── */}
+            {/* ─── TAB 4: CLIENT INQUIRIES & LEADS ─── */}
             {view === 'leads' && (
-              <div className="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-xs space-y-3 w-full">
-                <PageHeader
-                  icon="ri-user-star-line"
-                  title="Client & Buyer Inquiry Desk"
-                  badge="Live Inquiries"
-                  subtitle="Manage buyer requirements, investor inquiries, site visits, and instant WhatsApp connect"
-                />
+              <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-2xs space-y-3 w-full">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div>
+                    <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                      Operations Inquiry Desk
+                    </h2>
+                    <p className="text-[11px] text-slate-400">Assigned customer inquiries & follow-ups</p>
+                  </div>
+                </div>
                 <AssignedLeadsPanel />
               </div>
             )}
 
-            {/* ─── TAB 5: RERA & COMPLIANCE CHECKLIST ─── */}
-            {view === 'verification' && <ComplianceChecklist />}
+            {/* ─── TAB 5: COMPLIANCE CHECKLIST ─── */}
+            {view === 'compliance' && <ComplianceChecklist />}
 
-            {/* ─── TAB 6: CALCULATORS ─── */}
-            {view === 'calculator' && <CalculatorsPanel badge="Operations Tools" />}
+            {/* ─── TAB 6: CALCULATORS & CONVERTERS ─── */}
+            {view === 'calculator' && <CalculatorsPanel />}
           </main>
-
-          {/* Footer */}
-          <footer className="px-4 py-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400 font-medium bg-white">
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Baba Broker Operations Desk · v2.4
-            </span>
-            <span>Direct Support: <a href="mailto:support@bababroker.com" className="text-[#ea580c] hover:underline">support@bababroker.com</a></span>
-            <span className="hidden sm:inline">© 2026 Baba Broker. All rights reserved.</span>
-          </footer>
         </div>
       </div>
 
-      {/* Reusable Modals & Drawers */}
-      <WhatsAppPitchModal
-        property={pitchingProperty}
-        onClose={() => setPitchingProperty(null)}
-        senderName={employeeName}
-      />
+      {/* Slide-out Property Inspector Drawer */}
+      {viewingProperty && (
+        <PropertyDetailsDrawer
+          property={viewingProperty}
+          salesmanName={employeeName}
+          onClose={() => setViewingProperty(null)}
+          onPitch={(prop) => {
+            setViewingProperty(null);
+            setPitchingProperty(prop);
+          }}
+          onEdit={(prop) => {
+            setViewingProperty(null);
+            startEdit(prop);
+          }}
+        />
+      )}
 
-      <PropertyDetailsDrawer
-        property={viewingProperty}
-        onClose={() => setViewingProperty(null)}
-        onPitch={(item) => { setViewingProperty(null); setPitchingProperty(item); }}
-        onEdit={startEdit}
-        onToggleDealStatus={toggleDealStatus}
-      />
+      {/* WhatsApp Pitch Studio Modal */}
+      {pitchingProperty && (
+        <WhatsAppPitchModal
+          property={pitchingProperty}
+          salesmanName={employeeName}
+          onClose={() => setPitchingProperty(null)}
+        />
+      )}
     </div>
   );
 }

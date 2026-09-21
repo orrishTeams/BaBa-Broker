@@ -6,17 +6,30 @@ import { priceLabel, formatINR } from '../../utils/propertyConstants';
  * Supports slide-drawer detail inspection, deal status switches, 4-icon action buttons, and verification badges.
  */
 export default function PropertyTable({
-  listings = [],
+  properties,
+  listings = properties || [],
   currentPage = 1,
   pageSize = 15,
   onViewDetails,
+  onView = onViewDetails,
   onPitch,
   onEdit,
   onDelete,
   onToggleDealStatus,
   onToggleVerification,
   isEmployee = false,
+  showVerificationToggle = false,
 }) {
+  const items = properties || listings || [];
+  const handleView = onViewDetails || onView || (() => {});
+  const showVerification = Boolean(isEmployee || showVerificationToggle);
+
+  const handleDealStatus = (item) => {
+    if (typeof onToggleDealStatus === 'function') {
+      onToggleDealStatus(item, item.dealStatus);
+    }
+  };
+
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200/90 max-h-[62vh] overflow-y-auto bg-white shadow-2xs">
       <table className="w-full text-left text-xs border-collapse select-none">
@@ -30,7 +43,7 @@ export default function PropertyTable({
             <th className="py-2.5 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap">CONTACT</th>
             <th className="py-2.5 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap">NET PRICE</th>
             <th className="py-2.5 px-2.5 text-white border-r border-slate-700/60 whitespace-nowrap">BY</th>
-            {isEmployee && (
+            {showVerification && (
               <th className="py-2.5 px-2 text-white border-r border-slate-700/60 text-center w-20">VERIFIED</th>
             )}
             <th className="py-2.5 px-2 text-center text-white border-r border-slate-700/60 w-28 shrink-0">ACTIONS</th>
@@ -39,16 +52,30 @@ export default function PropertyTable({
         </thead>
 
         <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
-          {listings.map((item, idx) => {
-            const isSold = item.dealStatus === 'sold';
-            const isRented = item.dealStatus === 'rented';
-            const isClosed = isSold || isRented;
-            const isForRent = item.listingType === 'rent';
+          {items.length === 0 ? (
+            <tr>
+              <td
+                colSpan={showVerification ? 11 : 10}
+                className="py-12 text-center text-slate-400 bg-white"
+              >
+                <div className="flex flex-col items-center justify-center gap-1.5">
+                  <i className="ri-inbox-line text-3xl text-slate-300" />
+                  <span className="font-semibold text-xs text-slate-600">No properties found in this view</span>
+                  <span className="text-[11px] text-slate-400">Click &ldquo;+ Add New&rdquo; above to list a property or adjust filters</span>
+                </div>
+              </td>
+            </tr>
+          ) : (
+            items.map((item, idx) => {
+              const isSold = item.dealStatus === 'sold';
+              const isRented = item.dealStatus === 'rented';
+              const isClosed = isSold || isRented;
+              const isForRent = item.listingType === 'rent';
 
             return (
               <tr
-                key={item._id}
-                onClick={() => onViewDetails(item)}
+                key={item._id || idx}
+                onClick={() => handleView(item)}
                 className={`border-b border-slate-200/70 transition-colors duration-100 cursor-pointer ${
                   isClosed
                     ? 'bg-slate-100/60 text-slate-400'
@@ -173,12 +200,12 @@ export default function PropertyTable({
                   })()}
                 </td>
 
-                {/* 9. VERIFIED (ONLY FOR EMPLOYEE) */}
-                {isEmployee && (
+                {/* 9. VERIFIED */}
+                {showVerification && (
                   <td className="py-2 px-1.5 border-r border-slate-200/70 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      onClick={() => onToggleVerification(item._id, item.isVerified !== false)}
+                      onClick={() => onToggleVerification && onToggleVerification(item._id, item.isVerified !== false)}
                       className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider border cursor-pointer ${
                         item.isVerified !== false
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
@@ -197,7 +224,7 @@ export default function PropertyTable({
                     <button
                       type="button"
                       disabled={isClosed}
-                      onClick={() => onPitch(item)}
+                      onClick={() => onPitch && onPitch(item)}
                       className="p-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center justify-center cursor-pointer disabled:opacity-40 transition"
                       title="WhatsApp Pitch Flyer"
                     >
@@ -206,7 +233,7 @@ export default function PropertyTable({
 
                     <button
                       type="button"
-                      onClick={() => onViewDetails(item)}
+                      onClick={() => handleView(item)}
                       className="p-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold flex items-center justify-center cursor-pointer transition"
                       title="View Details (Address, Specs, Video Tour)"
                     >
@@ -216,7 +243,7 @@ export default function PropertyTable({
                     <button
                       type="button"
                       disabled={isClosed}
-                      onClick={() => onEdit(item)}
+                      onClick={() => onEdit && onEdit(item)}
                       className="p-1 rounded-md bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold flex items-center justify-center cursor-pointer disabled:opacity-40 transition"
                       title="Edit Listing"
                     >
@@ -242,7 +269,7 @@ export default function PropertyTable({
                   <div className="flex items-center justify-end">
                     <button
                       type="button"
-                      onClick={() => onToggleDealStatus(item)}
+                      onClick={() => handleDealStatus(item)}
                       className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border transition-all duration-150 cursor-pointer shadow-2xs font-mono select-none ${
                         isClosed
                           ? 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
@@ -269,7 +296,7 @@ export default function PropertyTable({
                 </td>
               </tr>
             );
-          })}
+          }))}
         </tbody>
       </table>
     </div>

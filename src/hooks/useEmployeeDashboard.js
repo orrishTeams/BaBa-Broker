@@ -222,7 +222,12 @@ export function useEmployeeDashboard() {
     }
   };
 
-  const toggleDealStatus = async (item) => {
+  const toggleDealStatus = async (itemOrId) => {
+    let item = itemOrId;
+    if (typeof itemOrId === 'string') {
+      item = listings.find((l) => l._id === itemOrId);
+    }
+    if (!item || !item._id) return;
     const isClosed = item.dealStatus === 'sold' || item.dealStatus === 'rented';
     const newStatus = isClosed ? 'available' : item.listingType === 'rent' ? 'rented' : 'sold';
     try {

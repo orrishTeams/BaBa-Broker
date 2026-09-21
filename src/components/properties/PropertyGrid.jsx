@@ -7,12 +7,19 @@ import { priceLabel, formatINR } from '../../utils/propertyConstants';
 export function PropertyCard({
   property,
   onViewDetails,
+  onView = onViewDetails,
   onPitch,
   onEdit,
   onDelete,
   onToggleDealStatus,
 }) {
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+  const handleView = onViewDetails || onView || (() => {});
+  const handleDealStatus = (item) => {
+    if (typeof onToggleDealStatus === 'function') {
+      onToggleDealStatus(item, item.dealStatus);
+    }
+  };
 
   const allPhotos = [
     property.coverImage,
@@ -25,7 +32,7 @@ export function PropertyCard({
 
   return (
     <div
-      onClick={() => onViewDetails(property)}
+      onClick={() => handleView(property)}
       className={`group rounded-2xl border transition-all duration-200 bg-white overflow-hidden shadow-2xs hover:shadow-md flex flex-col justify-between cursor-pointer ${
         isClosed ? 'border-slate-200 opacity-75' : 'border-slate-200/90 hover:border-orange-300'
       }`}
@@ -66,7 +73,7 @@ export function PropertyCard({
           <div className="absolute top-2.5 right-2.5" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
-              onClick={() => onToggleDealStatus(property)}
+              onClick={() => handleDealStatus(property)}
               className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase shadow-sm border ${
                 isClosed
                   ? 'bg-red-600 text-white border-red-500'
@@ -143,7 +150,7 @@ export function PropertyCard({
 
         <button
           type="button"
-          onClick={() => onViewDetails(property)}
+          onClick={() => handleView(property)}
           className="p-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-slate-200 hover:border-blue-200 text-xs font-bold transition cursor-pointer"
           title="View Details"
         >
@@ -178,20 +185,36 @@ export function PropertyCard({
  * Reusable Property Card Grid
  */
 export default function PropertyGrid({
-  listings = [],
+  properties,
+  listings = properties || [],
   onViewDetails,
+  onView = onViewDetails,
   onPitch,
   onEdit,
   onDelete,
   onToggleDealStatus,
 }) {
+  const items = properties || listings || [];
+  const handleView = onViewDetails || onView || (() => {});
+
+  if (items.length === 0) {
+    return (
+      <div className="py-12 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
+        <i className="ri-inbox-line text-3xl text-slate-300 block mb-2" />
+        <span className="font-semibold text-xs text-slate-600">No properties found in this view</span>
+        <p className="text-[11px] text-slate-400 mt-1">Adjust your filters or add a new property.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 pt-1">
-      {listings.map((item) => (
+      {items.map((item, idx) => (
         <PropertyCard
-          key={item._id}
+          key={item._id || idx}
           property={item}
-          onViewDetails={onViewDetails}
+          onViewDetails={handleView}
+          onView={handleView}
           onPitch={onPitch}
           onEdit={onEdit}
           onDelete={onDelete}

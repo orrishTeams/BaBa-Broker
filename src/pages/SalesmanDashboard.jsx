@@ -192,11 +192,15 @@ export default function SalesmanDashboard() {
 
                   <PropertyTable
                     properties={listings.slice(0, 8)}
+                    listings={listings.slice(0, 8)}
+                    currentPage={1}
+                    pageSize={8}
                     onView={(item) => setViewingProperty(item)}
+                    onViewDetails={(item) => setViewingProperty(item)}
                     onPitch={(item) => setPitchingProperty(item)}
                     onEdit={(item) => startEdit(item)}
                     onDelete={(id) => deleteListing(id)}
-                    onToggleDealStatus={(id, currentStatus) => toggleDealStatus(id, currentStatus)}
+                    onToggleDealStatus={(itemOrId, currentStatus) => toggleDealStatus(itemOrId, currentStatus)}
                   />
                 </div>
               </div>
@@ -323,20 +327,26 @@ export default function SalesmanDashboard() {
                 {inventoryViewMode === 'table' ? (
                   <PropertyTable
                     properties={paginatedListings}
+                    listings={paginatedListings}
+                    currentPage={currentPage}
+                    pageSize={PAGE_SIZE}
                     onView={(item) => setViewingProperty(item)}
+                    onViewDetails={(item) => setViewingProperty(item)}
                     onPitch={(item) => setPitchingProperty(item)}
                     onEdit={(item) => startEdit(item)}
                     onDelete={(id) => deleteListing(id)}
-                    onToggleDealStatus={(id, currentStatus) => toggleDealStatus(id, currentStatus)}
+                    onToggleDealStatus={(itemOrId, currentStatus) => toggleDealStatus(itemOrId, currentStatus)}
                   />
                 ) : (
                   <PropertyGrid
                     properties={paginatedListings}
+                    listings={paginatedListings}
                     onView={(item) => setViewingProperty(item)}
+                    onViewDetails={(item) => setViewingProperty(item)}
                     onPitch={(item) => setPitchingProperty(item)}
                     onEdit={(item) => startEdit(item)}
                     onDelete={(id) => deleteListing(id)}
-                    onToggleDealStatus={(id, currentStatus) => toggleDealStatus(id, currentStatus)}
+                    onToggleDealStatus={(itemOrId, currentStatus) => toggleDealStatus(itemOrId, currentStatus)}
                   />
                 )}
 
